@@ -4,15 +4,84 @@ from PySide6.QtWidgets import (
     QLabel, QToolBar, QStatusBar, QCheckBox, 
     QPushButton, QDialog, QDialogButtonBox, 
     QVBoxLayout, QMessageBox, QFileDialog,
-    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy
+    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget
 )
-from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont
+from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
 from PySide6.QtCore import Qt
+from utils import seed_detection, seeds_extraction
+import cv2
+import numpy as np
+
+
+class ImageGridWidget(QWidget):
+    def __init__(self, 
+                 background_text = "NINGUNA IMAGEN",
+                 image_clickable = True,
+                 grid_shape = [5,5]) -> None:
+        super().__init__()
+        self.initUI(background_text)
+        self.image_labels = {}
+        self.image_clickable = image_clickable
+    
+    def initUI(self, background_text):
+        #self.setStyleSheet("background-color: rgba(255, 255, 255, 150);")
+        self.grid_layout = QGridLayout()
+        self.setLayout(self.grid_layout)
+        self.setMinimumSize(600, 400)
+        # Mostrar text in backgroud
+        self.no_image_label = QLabel(background_text)
+        self.no_image_label.setAlignment(Qt.AlignCenter)
+        self.no_image_label.setStyleSheet("background-color: rgba(50, 50, 50, 100); color: white;")
+        self.no_image_label.setVisible(True)
+        self.grid_layout.addWidget(self.no_image_label,0,0,1,1)
+
+    def add_image(self, image_array, row, column, id_label):
+        h, w, channels  = image_array.shape
+        image_qimage =  QImage(image_array.data, w, h, w * channels, QImage.Format_RGB888)
+        pixmap = QPixmap.fromImage(image_qimage)
+
+        # Creamos un QLabel y establecemos la imagen como su pixmap
+        image_label = QLabel()
+        image_label.setPixmap(pixmap.scaled(100,100,Qt.KeepAspectRatio))
+        image_label.setAlignment(Qt.AlignCenter)
+
+        # Permitimos que el QLabel sea seleccionable
+        if self.image_clickable:
+            image_label.setCursor(Qt.PointingHandCursor)
+            image_label.mousePressEvent = lambda event: self.image_clicked(
+                event, image_label, id_label)
+
+        # Agregamos el QLabel con fondo negro y la imagen al layout
+        #self.seeds_grid_layout.addWidget(background_label, row, column, alignment= Qt.AlignCenter)
+        self.grid_layout.addWidget(image_label, row, column, alignment= Qt.AlignCenter)
+        self.image_labels[id_label] = False
+
+        self.no_image_label.setVisible(False)
+
+    def clear_images(self):
+        for i in reversed(range(self.grid_layout.count())):
+            widget = self.grid_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        self.no_image_label.setVisible(True)
+    
+    def image_clicked(self, event, image_label, id_image):
+        self.image_labels[id_image] = not self.image_labels[id_image]
+
+        # Cambiamos el estilo del QLabel cuando se hace clic en él
+        if self.image_labels[id_image]:
+            image_label.setStyleSheet("border: 3px solid green;")
+        else:
+            image_label.setStyleSheet("")
+            image_label.setStyleSheet("border: 3px solid black;")
 
 class MainWindow(QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
+        
+        
 
         self.setWindowTitle("IDENTISEED")
         self.setGeometry(100, 100, 500, 200)
@@ -24,7 +93,8 @@ class MainWindow(QMainWindow):
         # Main Layout Principal
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(20,20,20,20)
-
+        
+        
         # Layout Principal del Fomulario de Importar Imagen
         import_form_widget = QWidget()
         import_form_layout = QVBoxLayout(import_form_widget)
@@ -114,16 +184,22 @@ class MainWindow(QMainWindow):
         
         # Vista de las semillas identificadas
         self.process_view_widget = QWidget()
+      
         self.process_view_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
         process_view_layout = QVBoxLayout(self.process_view_widget)
-        background_process_view_label = QLabel("Ningua Imagen Importada")
-        background_process_view_label.setAlignment(Qt.AlignCenter)
-        background_process_view_label.setStyleSheet("color: rgba(0, 0, 0, 0.5);") 
-        background_process_view_label.setFont(QFont("Arial", 16))
-        process_view_layout.addWidget(background_process_view_label)
         
+
         main_layout.addWidget(self.process_view_widget)
 
+        tab_widget = QTabWidget()
+        process_view_layout.addWidget(tab_widget)
+
+        self.seeds_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada")
+        self.masks_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada", image_clickable = False)
+
+        tab_widget.addTab(self.seeds_tab, "Semillas")
+        tab_widget.addTab(self.masks_tab, "Mascaras")
+   
         self.central_widget = QWidget()
         self.central_widget.setLayout(main_layout)
         self.setCentralWidget(self.central_widget)
@@ -137,8 +213,8 @@ class MainWindow(QMainWindow):
                 print("Archivo no seleccionado")
             else:
                 print("Archivo seleccionado:", path)
-                pixmap = QPixmap("./sample_image/ANC-399-1-RGB.tif")
-                self.label_image_selected.setPixmap(pixmap.scaled(200,200, Qt.KeepAspectRatio))
+                pixmap = QPixmap(path)
+                self.label_image_selected.setPixmap(pixmap.scaled(400,400, Qt.KeepAspectRatio))
                 line_edit.setText(path)
         return _button_open_rgb_imge
             #self.path = path
@@ -177,39 +253,59 @@ class MainWindow(QMainWindow):
         print("success_validate:", success_validate)
         if not success_validate:
             return
-        self.process_view_widget.deleteLater()
-        self.process_view_widget = QWidget()
-        self.process_view_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
-        process_view_layout = QVBoxLayout(self.process_view_widget)
+
+        path_rgb_image = self.line_edits[0].text()
+        image_rgb = cv2.imread(path_rgb_image)
+        mask, centro_x, centro_y, ancho, largo, angulo, counter = seed_detection(image_rgb,plot=False)
+        seeds_rgb, seeds_masks = seeds_extraction([5,5], mask, image_rgb, centro_x, centro_y, ancho, largo, angulo)
         
+        for i in range(len(seeds_rgb)):
+            seed_image = seeds_rgb[i]
+            # completar fondo negro
+            h_seed, w_seed, _ = seed_image.shape
+            # Calcular la dimension maxima para hacer el fondo cuadrado
+            max_dimension = max(h_seed, w_seed)
+            # Crear una imagen negra cuadrada
+            black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
+            # Calcular las coordenadas para colocar la imagen original
+            inicio_y = (max_dimension - h_seed) // 2
+            inicio_x = (max_dimension - w_seed) // 2
+            # superponer imagen a frame negro
+            black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed] = seed_image
+    
+            black_frame = cv2.cvtColor(black_frame, cv2.COLOR_BGR2RGB)
+            column = i % 5
+            row = i // 5
+            self.seeds_tab.add_image(black_frame, row, column, i)
 
-        ident_seeds_label = QLabel("Semillas Identificadas")
-        ident_seeds_label.setAlignment(Qt.AlignLeft)
-        ident_seeds_label.setStyleSheet("color: black;")
-        ident_seeds_label.setMaximumHeight(20)
+            seed_mask = seeds_masks[i]
 
-        process_view_layout.addWidget(ident_seeds_label)
+            mask_black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
+            mask_black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed, :] = seed_mask[..., np.newaxis]
+            self.masks_tab.add_image(mask_black_frame, row, column, i)
 
-        seeds_grid_layout = QGridLayout()
-        seeds_grid_layout.setSpacing(10) # Espaciado uniforme entre las celdas de la cuadrícula
-        row, col = 0, 0
-        for i in range(16):
-                pixmap = QPixmap(self.line_edits[0].text())
-                label = QLabel()
-                label.setPixmap(pixmap.scaled(100,100,Qt.KeepAspectRatio))
-                col = i % 4
-                row = i // 4
-                seeds_grid_layout.addWidget(label, row, col, alignment= Qt.AlignCenter)
-
-        process_view_layout.addLayout(seeds_grid_layout)
-
-        layout = self.centralWidget().layout()
-        layout.addWidget(self.process_view_widget)
+            #self.image_labels[i] = False
+        
+        spectral_label = QLabel("Firmas Espectrales")
+        spectral_label.setAlignment(Qt.AlignLeft)
+        spectral_label.setStyleSheet("color: black;")
+        spectral_label.setMaximumHeight(20)
 
         print("Importar imagen")
     
+        
     def clean_form(self):
         print("Limpiar Formulario")
+
+    def image_clicked(self, event, background_label, id_image):
+        self.image_labels[id_image] = not self.image_labels[id_image]
+
+        # Cambiamos el estilo del QLabel cuando se hace clic en él
+        if self.image_labels[id_image]:
+            background_label.setStyleSheet("border: 3px solid green;")
+        else:
+            background_label.setStyleSheet("")
+            background_label.setStyleSheet("border: 3px solid black;")
 
 app = QApplication(sys.argv)
 w = MainWindow()
