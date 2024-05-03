@@ -4,13 +4,57 @@ from PySide6.QtWidgets import (
     QLabel, QToolBar, QStatusBar, QCheckBox, 
     QPushButton, QDialog, QDialogButtonBox, 
     QVBoxLayout, QMessageBox, QFileDialog,
-    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget
+    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar
 )
 from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
-from PySide6.QtCore import Qt
-from utils import seed_detection, seeds_extraction
+from PySide6.QtCore import Qt, QThread, Signal, QObject
+from utils import black_white, extract_one_seed_hsi_features, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi
 import cv2
 import numpy as np
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import matplotlib.pyplot as plt
+
+
+class Worker(QObject):
+    progress_changed = Signal(int)
+    images_masks = Signal(list, list)  # Señal para emitir datos al hilo principal
+    spectrum_data = Signal(object)
+    
+    def run(self, path_image_rgb, path_hsi_bil):
+        white_bands,black_bands = black_white("./sample_image/")
+    
+        
+        image_rgb = cv2.imread(path_image_rgb)
+        print("image_rgb.shape: ", image_rgb.shape)
+        mask, centro_x, centro_y, ancho, largo, angulo, counter = seed_detection(image_rgb,plot=False)
+        
+        #self.mask_seeds = mask
+        #self.centers_x = centro_x
+        seeds_rgb, seeds_masks, tras_matrix, rot_matrix, roi_seeds = seeds_extraction([5,5], mask, image_rgb, centro_x, centro_y, ancho, largo, angulo)
+        
+        
+        self.images_masks.emit(seeds_rgb, seeds_masks)
+
+        white_bands,black_bands = black_white("./sample_image/")
+        
+        frame_bands_correc = hyperspectral_images_seeds(path_hsi_bil, correction=True, white_bands=white_bands,black_bands=black_bands)
+        print("frame_bands_correc.shape: ", frame_bands_correc.shape)
+        seeds_spectrum = {}
+        dsize = (image_rgb.shape[1], image_rgb.shape[0])
+        for i in range(25):
+            mini_mask = seeds_masks[i]
+            traslate_matrix = tras_matrix[i]
+            rotate_matrix = rot_matrix[i]
+            roi_seed = roi_seeds[i]
+            y_mean, y_std = extract_one_seed_hsi_features(frame_bands_correc, dsize, mini_mask, traslate_matrix, rotate_matrix, roi_seed)
+            
+            extract_one_seed_hsi([5,5], mask, image_rgb, frame_bands_correc, centro_x, centro_y, ancho, largo, angulo, i + 1, plot= False)
+            seeds_spectrum[str(i)] = {"x_long_waves": long_onda , "y_mean":  y_mean, "y_std": y_std} 
+            self.progress_changed.emit(i * 100 / 25)
+
+        self.spectrum_data.emit(seeds_spectrum)
+
+        self.progress_changed.emit(100)
 
 
 class ImageGridWidget(QWidget):
@@ -31,7 +75,7 @@ class ImageGridWidget(QWidget):
         # Mostrar text in backgroud
         self.no_image_label = QLabel(background_text)
         self.no_image_label.setAlignment(Qt.AlignCenter)
-        self.no_image_label.setStyleSheet("background-color: rgba(50, 50, 50, 100); color: white;")
+        self.no_image_label.setStyleSheet("font-size: 18px; background-color: rgba(50, 50, 50, 100); color: white;")
         self.no_image_label.setVisible(True)
         self.grid_layout.addWidget(self.no_image_label,0,0,1,1)
 
@@ -75,14 +119,15 @@ class ImageGridWidget(QWidget):
         else:
             image_label.setStyleSheet("")
             image_label.setStyleSheet("border: 3px solid black;")
+    
+    def get_images_clicked_status(self):
+        return self.image_labels
 
 class MainWindow(QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
         
-        
-
         self.setWindowTitle("IDENTISEED")
         self.setGeometry(100, 100, 500, 200)
         # Colores
@@ -98,7 +143,7 @@ class MainWindow(QMainWindow):
         # Layout Principal del Fomulario de Importar Imagen
         import_form_widget = QWidget()
         import_form_layout = QVBoxLayout(import_form_widget)
-        import_form_widget.setMaximumSize(600, 16777215)
+        import_form_widget.setMaximumSize(800, 16777215)
         # Layout de cada campo del formulario
         input_rgb_image_layout = QHBoxLayout()
         input_cabecera_layout = QHBoxLayout()
@@ -179,6 +224,10 @@ class MainWindow(QMainWindow):
 
         import_form_layout.addLayout(buttons_form_layout)
         
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setValue(0)
+        import_form_layout.addWidget(self.progress_bar)
+
         main_layout.addWidget(import_form_widget)
         main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
         
@@ -199,11 +248,91 @@ class MainWindow(QMainWindow):
 
         tab_widget.addTab(self.seeds_tab, "Semillas")
         tab_widget.addTab(self.masks_tab, "Mascaras")
-   
+
+        ## Boton de ver grafico de bandas espectradles
+
+        spectrum_button = QPushButton("Mostrar Firma Espectral")
+        spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        spectrum_button.clicked.connect(self.button_show_spectrum)
+        spectrum_label = QLabel("<b>Spectrum</b>")
+        spectrum_label.setAlignment(Qt.AlignLeft)
+        spectrum_label.setStyleSheet("font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;")
+
+        process_view_layout.addWidget(spectrum_button)
+        process_view_layout.addWidget(spectrum_label)
+
+
+        # Crear y agregar la sección del gráfico
+        self.graph_section = QWidget()
+        self.graph_section.setStyleSheet("background-color: #f0f0f0;")
+        self.graph_section.setMinimumSize(600, 300)
+
+        # Layout para la sección del gráfico
+        self.graph_layout = QHBoxLayout(self.graph_section)
+        self.fig, self.ax = plt.subplots()
+        self.canvas = FigureCanvas(self.fig)
+        self.graph_layout.addWidget(self.canvas)
+
+        process_view_layout.addWidget(self.graph_section)
+
         self.central_widget = QWidget()
         self.central_widget.setLayout(main_layout)
         self.setCentralWidget(self.central_widget)
 
+
+    def show_images_masks(self, seeds_rgb, seeds_masks):
+        # Crear un Worker y conectar la señal del Worker a los métodos de actualización de la interfaz de usuario
+        
+        for i in range(len(seeds_rgb)):
+            seed_image = seeds_rgb[i]
+            # completar fondo negro
+            h_seed, w_seed, _ = seed_image.shape
+            # Calcular la dimension maxima para hacer el fondo cuadrado
+            max_dimension = max(h_seed, w_seed)
+            # Crear una imagen negra cuadrada
+            black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
+            # Calcular las coordenadas para colocar la imagen original
+            inicio_y = (max_dimension - h_seed) // 2
+            inicio_x = (max_dimension - w_seed) // 2
+            # superponer imagen a frame negro
+            black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed] = seed_image
+    
+            black_frame = cv2.cvtColor(black_frame, cv2.COLOR_BGR2RGB)
+            column = i % 5
+            row = i // 5
+            self.seeds_tab.add_image(black_frame, row, column, i)
+
+            seed_mask = seeds_masks[i]
+
+            mask_black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
+            mask_black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed, :] = seed_mask[..., np.newaxis]
+            self.masks_tab.add_image(mask_black_frame, row, column, i)
+
+    def update_progress(self, value):
+        self.progress_bar.setValue(value)
+
+
+    def button_show_spectrum(self):
+        #Crear y agregar el gráfico dentro de la sección del gráfico
+     
+        # Actualizar el gráfico de barras
+        self.ax.clear()
+        images_clicked_status = self.seeds_tab.get_images_clicked_status()
+        images_clicked_ids = [ key for key, value in images_clicked_status.items() if value]
+        if len(images_clicked_ids) > 0:
+            #self.ax.hist(file_sizes, bins=20, alpha=0.7, color='blue')
+            for image_id in images_clicked_ids:
+                x = self.spectrum_data[str(image_id)]["x_long_waves"]
+                y_mean = self.spectrum_data[str(image_id)]["y_mean"]
+                self.ax.plot(x, y_mean)
+            self.ax.set_title('Spectrum')
+            self.ax.set_xlabel('Longitudes de Onda Luz')
+            self.ax.set_ylabel('Reflectance Mean')
+        else:
+            self.ax.text(0.5, 0.5, 'Ningua semilla seleccionada', horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+        self.canvas.draw()
+
+        return 
 
     def button_open_rgb_imge(self, line_edit):
         def _button_open_rgb_imge():
@@ -214,7 +343,7 @@ class MainWindow(QMainWindow):
             else:
                 print("Archivo seleccionado:", path)
                 pixmap = QPixmap(path)
-                self.label_image_selected.setPixmap(pixmap.scaled(400,400, Qt.KeepAspectRatio))
+                self.label_image_selected.setPixmap(pixmap.scaled(600,600, Qt.KeepAspectRatio))
                 line_edit.setText(path)
         return _button_open_rgb_imge
             #self.path = path
@@ -249,50 +378,37 @@ class MainWindow(QMainWindow):
         return True
     
     def import_image(self):
+        self.import_button.setEnabled(False)
+        self.progress_bar.setValue(0)
+
         success_validate = self.validate_filled_form()
         print("success_validate:", success_validate)
         if not success_validate:
             return
-
+        
         path_rgb_image = self.line_edits[0].text()
-        image_rgb = cv2.imread(path_rgb_image)
-        mask, centro_x, centro_y, ancho, largo, angulo, counter = seed_detection(image_rgb,plot=False)
-        seeds_rgb, seeds_masks = seeds_extraction([5,5], mask, image_rgb, centro_x, centro_y, ancho, largo, angulo)
+        path_hypespect_image = self.line_edits[2].text()
+
+        self.thread_process = QThread()
+        self.worker = Worker()
+        self.worker.moveToThread(self.thread_process)
+        self.thread_process.started.connect(lambda: self.worker.run(path_rgb_image, path_hypespect_image))
+        self.worker.progress_changed.connect(self.update_progress)
+        self.worker.images_masks.connect(self.show_images_masks)
+        self.worker.spectrum_data.connect(self.recive_spectrum_data)
+        self.thread_process.finished.connect(self.process_finished)
         
-        for i in range(len(seeds_rgb)):
-            seed_image = seeds_rgb[i]
-            # completar fondo negro
-            h_seed, w_seed, _ = seed_image.shape
-            # Calcular la dimension maxima para hacer el fondo cuadrado
-            max_dimension = max(h_seed, w_seed)
-            # Crear una imagen negra cuadrada
-            black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
-            # Calcular las coordenadas para colocar la imagen original
-            inicio_y = (max_dimension - h_seed) // 2
-            inicio_x = (max_dimension - w_seed) // 2
-            # superponer imagen a frame negro
-            black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed] = seed_image
-    
-            black_frame = cv2.cvtColor(black_frame, cv2.COLOR_BGR2RGB)
-            column = i % 5
-            row = i // 5
-            self.seeds_tab.add_image(black_frame, row, column, i)
+        self.thread_process.start()
 
-            seed_mask = seeds_masks[i]
+    def recive_spectrum_data(self, spectrum_data):
+        self.spectrum_data = spectrum_data
 
-            mask_black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
-            mask_black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed, :] = seed_mask[..., np.newaxis]
-            self.masks_tab.add_image(mask_black_frame, row, column, i)
 
-            #self.image_labels[i] = False
-        
-        spectral_label = QLabel("Firmas Espectrales")
-        spectral_label.setAlignment(Qt.AlignLeft)
-        spectral_label.setStyleSheet("color: black;")
-        spectral_label.setMaximumHeight(20)
-
-        print("Importar imagen")
-    
+    def process_finished(self, result):
+        # Este método se llama cuando el proceso en segundo plano ha terminado
+        self.import_button.setEnabled(True)
+        print("Proceso terminado")
+      
         
     def clean_form(self):
         print("Limpiar Formulario")
