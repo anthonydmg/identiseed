@@ -7,24 +7,91 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar
 )
 from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
-from PySide6.QtCore import Qt, QThread, Signal, QObject
+from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool
 from utils import black_white, extract_one_seed_hsi_features, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi
 import cv2
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
-class Worker(QObject):
+class MatplotlibWidget(QWidget):
+    def __init__(self, xlabel, ylabel, title = None) -> None:
+        super().__init__()
+
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        self.setStyleSheet("background-color: #f0f0f0;")
+        self.setMinimumSize(600, 300)
+
+        self.fig, self.ax = plt.subplots()
+        self.canvas = FigureCanvas(self.fig)
+        layout.addWidget(self.canvas)
+        self.title = title
+        
+        self.xlabel = xlabel
+        self.ylabel = ylabel
+
+        if title:
+            self.ax.set_title(title)
+        
+        self.ax.set_xlabel(xlabel)
+        self.ax.set_ylabel(ylabel)
+
+        self.canvas.setVisible(False)
+        #self.ax.text(0.5, 0.5, 'Ningua semilla seleccionada', horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+
+
+    
+    def update_plot(self, x_data, y_data, labels):
+                    
+                    #*y_data_labels):
+        # Graficamos los datos
+        self.canvas.setVisible(True)
+        self.ax.clear()
+        for y_data, label in zip(y_data, labels):
+            self.ax.plot(x_data, y_data, label = label)
+        
+        
+        if self.title is not None:
+            self.ax.set_title(self.title)
+    
+        self.ax.set_xlabel(self.xlabel)
+        self.ax.set_ylabel(self.ylabel)
+        self.ax.legend(loc='upper left')
+        self.canvas.draw()
+        
+    
+    
+    def clear_plot(self):
+        self.ax.clear()
+        self.canvas.setVisible(False)
+
+    #self.ax.plot(x_data, y1_data)
+
+
+class WorkerSignals(QObject):
     progress_changed = Signal(int)
     images_masks = Signal(list, list)  # Señal para emitir datos al hilo principal
     spectrum_data = Signal(object)
     
-    def run(self, path_image_rgb, path_hsi_bil):
+
+
+class Worker(QRunnable):
+
+    def __init__(self, path_rgb_image, path_hypespect_image) -> None:
+        super(Worker, self).__init__()
+
+        self.signals = WorkerSignals()
+        self.path_rgb_image = path_rgb_image
+        self.path_hypespect_image = path_hypespect_image
+
+    def run(self):
         white_bands,black_bands = black_white("./sample_image/")
-    
+
         
-        image_rgb = cv2.imread(path_image_rgb)
+        image_rgb = cv2.imread(self.path_rgb_image)
         print("image_rgb.shape: ", image_rgb.shape)
         mask, centro_x, centro_y, ancho, largo, angulo, counter = seed_detection(image_rgb,plot=False)
         
@@ -33,11 +100,11 @@ class Worker(QObject):
         seeds_rgb, seeds_masks, tras_matrix, rot_matrix, roi_seeds = seeds_extraction([5,5], mask, image_rgb, centro_x, centro_y, ancho, largo, angulo)
         
         
-        self.images_masks.emit(seeds_rgb, seeds_masks)
+        self.signals.images_masks.emit(seeds_rgb, seeds_masks)
 
         white_bands,black_bands = black_white("./sample_image/")
         
-        frame_bands_correc = hyperspectral_images_seeds(path_hsi_bil, correction=True, white_bands=white_bands,black_bands=black_bands)
+        frame_bands_correc = hyperspectral_images_seeds(self.path_hypespect_image, correction=True, white_bands=white_bands,black_bands=black_bands)
         print("frame_bands_correc.shape: ", frame_bands_correc.shape)
         seeds_spectrum = {}
         dsize = (image_rgb.shape[1], image_rgb.shape[0])
@@ -50,11 +117,11 @@ class Worker(QObject):
             
             extract_one_seed_hsi([5,5], mask, image_rgb, frame_bands_correc, centro_x, centro_y, ancho, largo, angulo, i + 1, plot= False)
             seeds_spectrum[str(i)] = {"x_long_waves": long_onda , "y_mean":  y_mean, "y_std": y_std} 
-            self.progress_changed.emit(i * 100 / 25)
+            self.signals.progress_changed.emit(i * 100 / 25)
 
-        self.spectrum_data.emit(seeds_spectrum)
+        self.signals.spectrum_data.emit(seeds_spectrum)
 
-        self.progress_changed.emit(100)
+        self.signals.progress_changed.emit(100)
 
 
 class ImageGridWidget(QWidget):
@@ -94,6 +161,8 @@ class ImageGridWidget(QWidget):
             image_label.setCursor(Qt.PointingHandCursor)
             image_label.mousePressEvent = lambda event: self.image_clicked(
                 event, image_label, id_label)
+
+        image_label.setToolTip(f'Semilla-{id_label}')
 
         # Agregamos el QLabel con fondo negro y la imagen al layout
         #self.seeds_grid_layout.addWidget(background_label, row, column, alignment= Qt.AlignCenter)
@@ -254,32 +323,98 @@ class MainWindow(QMainWindow):
         spectrum_button = QPushButton("Mostrar Firma Espectral")
         spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         spectrum_button.clicked.connect(self.button_show_spectrum)
-        spectrum_label = QLabel("<b>Spectrum</b>")
+        
+        process_view_layout.addWidget(spectrum_button)
+
+        ## Header se seccion de descarga de informacion hypespectral
+        spectrum_header = QWidget()
+        spectrum_header.setStyleSheet("font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;")
+        spectrum_header_layout = QHBoxLayout(spectrum_header)
+       
+        spectrum_label = QLabel("<b>Información Hiperespectral</b>")
         spectrum_label.setAlignment(Qt.AlignLeft)
         spectrum_label.setStyleSheet("font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;")
 
-        process_view_layout.addWidget(spectrum_button)
-        process_view_layout.addWidget(spectrum_label)
+        self.download_spectrum = QPushButton()
+        
+        icon_download = QIcon("./icons/icons8-descargar-48.png")  # Ruta al archivo de icono
+        self.download_spectrum.setIcon(icon_download)
+
+        self.download_spectrum.clicked.connect(self.download_csv_spectrum)
 
 
-        # Crear y agregar la sección del gráfico
-        self.graph_section = QWidget()
-        self.graph_section.setStyleSheet("background-color: #f0f0f0;")
-        self.graph_section.setMinimumSize(600, 300)
+        spectrum_header_layout.addWidget(spectrum_label)
+        spectrum_header_layout.addStretch(1)
+        spectrum_header_layout.addWidget(self.download_spectrum)
+        
+        process_view_layout.addWidget(spectrum_header)
 
-        # Layout para la sección del gráfico
-        self.graph_layout = QHBoxLayout(self.graph_section)
-        self.fig, self.ax = plt.subplots()
-        self.canvas = FigureCanvas(self.fig)
-        self.graph_layout.addWidget(self.canvas)
+        tab_hci_data = QTabWidget()
+        process_view_layout.addWidget(tab_hci_data)
+        
+        ## Tab de grafico de avg 
+        self.spectrum_avg_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
 
-        process_view_layout.addWidget(self.graph_section)
+        #self.spectrum_avg_graph =  QWidget()
+        #self.spectrum_avg_graph.setStyleSheet("background-color: #f0f0f0;")
+        #self.spectrum_avg_graph.setMinimumSize(600, 300)
+        
+        #self.graph_layout_avg = QHBoxLayout(self.spectrum_avg_graph)
+        #self.fig_avg, self.ax_avg = plt.subplots()
+        #self.canvas_avg_graph = FigureCanvas(self.fig_avg)
+        #self.graph_layout_avg.addWidget(self.canvas_avg_graph)
 
+        #self.canvas_avg_graph.setVisible(False)
+
+        tab_hci_data.addTab(self.spectrum_avg_plot, "Spectrum (avg)")
+        ## Tab de grafico de desviacion estandar 
+        self.spectrum_std_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
+
+        #self.spectrum_sd_graph =  QWidget()
+        #self.spectrum_sd_graph.setStyleSheet("background-color: #f0f0f0;")
+        #self.spectrum_sd_graph.setMinimumSize(600, 300)
+        
+        #self.graph_layout_sd = QHBoxLayout(self.spectrum_sd_graph)
+        #self.fig_sd, self.ax_sd = plt.subplots()
+        #self.canvas_sd_graph = FigureCanvas(self.fig_sd)
+        #self.graph_layout_sd.addWidget(self.canvas_sd_graph)
+
+        #self.canvas_sd_graph.setVisible(False)
+
+        tab_hci_data.addTab(self.spectrum_std_plot, "Spectrum (sd)")
+
+        
         self.central_widget = QWidget()
         self.central_widget.setLayout(main_layout)
         self.setCentralWidget(self.central_widget)
 
+        self.threadpool = QThreadPool()
+        print("Multithreading with maximum %d threads" % self.threadpool.maxThreadCount())
 
+    def download_csv_spectrum(self):
+        #options = QFileDialog.Options()
+        #ptions |= QFileDialog.DontUseNativeDialog
+        fileName, _ = QFileDialog.getSaveFileName(self, "Seleccionar archivo o carpeta", "", "CSV Files (*.csv);;All Files (*)")
+        if fileName:
+            # Verificar si el nombre del archivo tiene la extensión .csv
+            if not fileName.endswith(".csv"):
+                # Agregar la extensión .csv si no está presente
+                fileName += ".csv"
+            print("Archivo seleccionado:", fileName)
+
+            ## Guardar archivo
+            x_long_waves = self.spectrum_data['0']['x_long_waves']
+
+            columns = ["seed_id"] +  [f"avg_band_{lw}" for lw in x_long_waves] + [ f"sd_band_{lw}" for lw in x_long_waves]
+            
+            print("\nself.spectrum_data:", self.spectrum_data)
+            data = [ [id_seed] + seed_data["y_mean"].tolist() + seed_data["y_std"].tolist() for id_seed , seed_data in self.spectrum_data.items()]
+            print()
+            print("\ndata[0]:", data[0]) 
+            df = pd.DataFrame(data, columns = columns)
+            print(df)
+            df.to_csv(fileName, index= False)
+            
     def show_images_masks(self, seeds_rgb, seeds_masks):
         # Crear un Worker y conectar la señal del Worker a los métodos de actualización de la interfaz de usuario
         
@@ -316,21 +451,35 @@ class MainWindow(QMainWindow):
         #Crear y agregar el gráfico dentro de la sección del gráfico
      
         # Actualizar el gráfico de barras
-        self.ax.clear()
+        #self.canvas_avg_graph.setVisible(True)
+        #self.ax_avg.clear()
         images_clicked_status = self.seeds_tab.get_images_clicked_status()
         images_clicked_ids = [ key for key, value in images_clicked_status.items() if value]
         if len(images_clicked_ids) > 0:
             #self.ax.hist(file_sizes, bins=20, alpha=0.7, color='blue')
+            x = self.spectrum_data[str(images_clicked_ids[0])]["x_long_waves"]
+            y_mean_data = []
+            y_std_data = []
+            seed_labels = []
+                      
             for image_id in images_clicked_ids:
-                x = self.spectrum_data[str(image_id)]["x_long_waves"]
                 y_mean = self.spectrum_data[str(image_id)]["y_mean"]
-                self.ax.plot(x, y_mean)
-            self.ax.set_title('Spectrum')
-            self.ax.set_xlabel('Longitudes de Onda Luz')
-            self.ax.set_ylabel('Reflectance Mean')
-        else:
-            self.ax.text(0.5, 0.5, 'Ningua semilla seleccionada', horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
-        self.canvas.draw()
+                y_std = self.spectrum_data[str(image_id)]["y_std"]
+                seed_label = f"semilla-{image_id}"
+
+                y_mean_data.append(y_mean)
+                y_std_data.append(y_std)
+                seed_labels.append(seed_label)
+            
+            self.spectrum_avg_plot.update_plot(x_data=x, y_data = y_mean_data, labels=seed_labels)
+            self.spectrum_std_plot.update_plot(x_data=x, y_data = y_std_data, labels=seed_labels)
+            #self.ax_avg.set_title('Spectrum (avg)')
+            #self.ax_avg.set_xlabel('Longitudes de Onda Luz')
+            #self.ax_avg.set_ylabel('Reflectance Mean')
+            
+        #else:
+            #self.ax_avg.text(0.5, 0.5, 'Ningua semilla seleccionada', horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+            #self.canvas_avg_graph.draw()
 
         return 
 
@@ -389,16 +538,13 @@ class MainWindow(QMainWindow):
         path_rgb_image = self.line_edits[0].text()
         path_hypespect_image = self.line_edits[2].text()
 
-        self.thread_process = QThread()
-        self.worker = Worker()
-        self.worker.moveToThread(self.thread_process)
-        self.thread_process.started.connect(lambda: self.worker.run(path_rgb_image, path_hypespect_image))
-        self.worker.progress_changed.connect(self.update_progress)
-        self.worker.images_masks.connect(self.show_images_masks)
-        self.worker.spectrum_data.connect(self.recive_spectrum_data)
-        self.thread_process.finished.connect(self.process_finished)
+        #self.thread_process = QThread()
+        worker = Worker(path_rgb_image, path_hypespect_image)
+        worker.signals.progress_changed.connect(self.update_progress)
+        worker.signals.images_masks.connect(self.show_images_masks)
+        worker.signals.spectrum_data.connect(self.recive_spectrum_data)
         
-        self.thread_process.start()
+        self.threadpool.start(worker)
 
     def recive_spectrum_data(self, spectrum_data):
         self.spectrum_data = spectrum_data
