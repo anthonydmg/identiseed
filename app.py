@@ -225,7 +225,7 @@ class MainWindow(QMainWindow):
         p.setColor(import_form_widget.backgroundRole(), color_fondo)
         import_form_widget.setPalette(p)
         
-        label_rgb_image = QLabel("Importar Imagen RGB (.tiff)")
+        label_rgb_image = QLabel("Imagen RGB (.tiff)")
         label_rgb_image.setStyleSheet("color: {};".format(color_texto.name()))
         input_rgb_image = QLineEdit()
         button_rgb_image = QPushButton("Seleccionar")
@@ -236,7 +236,7 @@ class MainWindow(QMainWindow):
         asterisk_label_rbg.setStyleSheet("color: red;")
         asterisk_label_rbg.setFont(QFont("Arial", 12, QFont.Bold))
 
-        label_cabecera = QLabel("Importar Cebecera (.bil.hdr)")
+        """ label_cabecera = QLabel("Cebecera (.bil.hdr)")
         input_cabecera = QLineEdit()
         button_cabecera = QPushButton("Seleccionar")
         button_cabecera.clicked.connect(self.button_open_cabecera(input_cabecera))
@@ -244,7 +244,7 @@ class MainWindow(QMainWindow):
 
         asterisk_label_cabecera = QLabel("*")
         asterisk_label_cabecera.setStyleSheet("color: red;")
-        asterisk_label_cabecera.setFont(QFont("Arial", 12, QFont.Bold))
+        asterisk_label_cabecera.setFont(QFont("Arial", 12, QFont.Bold)) """
 
         label_hsi = QLabel("Importar Imagen Hiperspectral (.bil)")
         input_hsi = QLineEdit()
@@ -262,17 +262,17 @@ class MainWindow(QMainWindow):
         input_rgb_image_layout.addWidget(input_rgb_image)
         input_rgb_image_layout.addWidget(button_rgb_image)
 
-        input_cabecera_layout.addWidget(label_cabecera)
+        """ input_cabecera_layout.addWidget(label_cabecera)
         input_cabecera_layout.addWidget(asterisk_label_cabecera)
         input_cabecera_layout.addWidget(input_cabecera)
         input_cabecera_layout.addWidget(button_cabecera)
-     
+      """
         input_hsi_layout.addWidget(label_hsi)
         input_hsi_layout.addWidget(asterisk_label_hsi)
         input_hsi_layout.addWidget(input_hsi)
         input_hsi_layout.addWidget(button_hsi)
         
-        self.line_edits = [input_rgb_image, input_cabecera, input_hsi]
+        self.line_edits = [input_rgb_image, input_hsi]
     
         import_form_layout.addLayout(input_rgb_image_layout)
         import_form_layout.addLayout(input_cabecera_layout)
@@ -286,7 +286,7 @@ class MainWindow(QMainWindow):
         self.clean_button.clicked.connect(self.clean_form)
         
         #Boton de Limpiar formulario
-        self.import_button = QPushButton("Importar")
+        self.import_button = QPushButton("Procesar")
         self.import_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         buttons_form_layout.addWidget(self.import_button)
         self.import_button.clicked.connect(self.import_image)
@@ -320,7 +320,7 @@ class MainWindow(QMainWindow):
 
         ## Boton de ver grafico de bandas espectradles
 
-        spectrum_button = QPushButton("Mostrar Firma Espectral")
+        spectrum_button = QPushButton("Mostrar Informacion Espectral")
         spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         spectrum_button.clicked.connect(self.button_show_spectrum)
         
@@ -366,7 +366,7 @@ class MainWindow(QMainWindow):
 
         #self.canvas_avg_graph.setVisible(False)
 
-        tab_hci_data.addTab(self.spectrum_avg_plot, "Spectrum (avg)")
+        tab_hci_data.addTab(self.spectrum_avg_plot, "Espectro (Promedio)")
         ## Tab de grafico de desviacion estandar 
         self.spectrum_std_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
 
@@ -381,7 +381,7 @@ class MainWindow(QMainWindow):
 
         #self.canvas_sd_graph.setVisible(False)
 
-        tab_hci_data.addTab(self.spectrum_std_plot, "Spectrum (sd)")
+        tab_hci_data.addTab(self.spectrum_std_plot, "Espectro (Des. Estandar)")
 
         
         self.central_widget = QWidget()
