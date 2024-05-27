@@ -1,0 +1,3 @@
+
+Esta guia para la creacion del ejecutable:
+https://www.pythonguis.com/tutorials/packaging-pyside6-applications-windows-pyinstaller-installforge/

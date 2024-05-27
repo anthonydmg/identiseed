@@ -217,6 +217,13 @@ class MainWindow(QMainWindow):
         input_rgb_image_layout = QHBoxLayout()
         input_cabecera_layout = QHBoxLayout()
         input_hsi_layout  = QHBoxLayout()
+        input_white_hsi_layout  = QHBoxLayout()
+        input_black_hsi_layout  = QHBoxLayout()
+        columna_layout  = QHBoxLayout()
+        input_grid_config_layout  = QHBoxLayout()
+        input_grid_row_column_layout  = QHBoxLayout()
+        
+        #row_colum_layout = QHBoxLayout()
         buttons_form_layout = QHBoxLayout()
         
         # Establecer fondo para el formulario
@@ -225,6 +232,33 @@ class MainWindow(QMainWindow):
         p.setColor(import_form_widget.backgroundRole(), color_fondo)
         import_form_widget.setPalette(p)
         
+        label_dist_grid_image = QLabel("Distribucion de grilla de semillas")
+        label_dist_grid_image.setStyleSheet("color: {};".format(color_texto.name()))
+        
+        #input_grid_config_layout.addWidget(label_dist_grid_image)
+
+        label_row_grid = QLabel("Numero de Filas:")
+        label_row_grid.setStyleSheet("color: {};".format(color_texto.name()))
+        input_row_grid = QLineEdit()
+        
+        row_colum_widget = QWidget()
+        row_colum_layout = QHBoxLayout(row_colum_widget)
+        #row_colum_widget.setMaximumHeight(100)
+
+        label_colum_grid = QLabel("Numero de Columnas:")
+        label_colum_grid.setStyleSheet("color: {};".format(color_texto.name()))
+        input_colum_grid = QLineEdit()
+
+        row_colum_layout.addWidget(label_row_grid)
+        row_colum_layout.addWidget(input_row_grid)
+        row_colum_layout.addWidget(label_colum_grid)
+        row_colum_layout.addWidget(input_colum_grid)
+
+        
+      
+        input_grid_row_column_layout.addWidget(row_colum_widget)
+        #input_grid_config_layout.addWidget(row_colum_widget)
+
         label_rgb_image = QLabel("Imagen RGB (.tiff)")
         label_rgb_image.setStyleSheet("color: {};".format(color_texto.name()))
         input_rgb_image = QLineEdit()
@@ -236,17 +270,7 @@ class MainWindow(QMainWindow):
         asterisk_label_rbg.setStyleSheet("color: red;")
         asterisk_label_rbg.setFont(QFont("Arial", 12, QFont.Bold))
 
-        """ label_cabecera = QLabel("Cebecera (.bil.hdr)")
-        input_cabecera = QLineEdit()
-        button_cabecera = QPushButton("Seleccionar")
-        button_cabecera.clicked.connect(self.button_open_cabecera(input_cabecera))
-        button_cabecera.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-
-        asterisk_label_cabecera = QLabel("*")
-        asterisk_label_cabecera.setStyleSheet("color: red;")
-        asterisk_label_cabecera.setFont(QFont("Arial", 12, QFont.Bold)) """
-
-        label_hsi = QLabel("Importar Imagen Hiperspectral (.bil)")
+        label_hsi = QLabel("Imagen Hiperspectral (.bil)")
         input_hsi = QLineEdit()
         button_hsi = QPushButton("Seleccionar")
         button_hsi.clicked.connect(self.button_open_hsi(input_hsi))
@@ -255,6 +279,37 @@ class MainWindow(QMainWindow):
         asterisk_label_hsi.setStyleSheet("color: red;")
         asterisk_label_hsi.setFont(QFont("Arial", 12, QFont.Bold))
 
+
+        label_white_hsi = QLabel("Blanco de Referencia (.bil)")
+        input_white_hsi = QLineEdit()
+        button_white_hsi = QPushButton("Seleccionar")
+        button_white_hsi.clicked.connect(self.button_open_white_hsi(input_white_hsi))
+        button_white_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        asterisk_label_white_hsi = QLabel("*")
+        asterisk_label_white_hsi.setStyleSheet("color: red;")
+        asterisk_label_white_hsi.setFont(QFont("Arial", 12, QFont.Bold))
+
+
+        label_black_hsi = QLabel("Negro de Referencia (.bil)")
+        input_black_hsi = QLineEdit()
+        button_black_hsi = QPushButton("Seleccionar")
+        button_black_hsi.clicked.connect(self.button_open_black_hsi(input_black_hsi))
+        button_black_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        asterisk_label_black_hsi = QLabel("*")
+        asterisk_label_black_hsi.setStyleSheet("color: red;")
+        asterisk_label_black_hsi.setFont(QFont("Arial", 12, QFont.Bold))
+        
+        label_columna = QLabel("Numero de Filas")
+        input_columna = QLineEdit()
+        input_columna.setFixedWidth(30)
+        asterisk_label_columna = QLabel("*")
+        asterisk_label_columna.setFixedWidth(20)
+        asterisk_label_columna.setStyleSheet("color: red;")
+        asterisk_label_columna.setFont(QFont("Arial", 12, QFont.Bold))
+
+        label_row = QLabel("Numero de Columnas")
+
+
         self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
 
         input_rgb_image_layout.addWidget(label_rgb_image)
@@ -262,22 +317,41 @@ class MainWindow(QMainWindow):
         input_rgb_image_layout.addWidget(input_rgb_image)
         input_rgb_image_layout.addWidget(button_rgb_image)
 
-        """ input_cabecera_layout.addWidget(label_cabecera)
-        input_cabecera_layout.addWidget(asterisk_label_cabecera)
-        input_cabecera_layout.addWidget(input_cabecera)
-        input_cabecera_layout.addWidget(button_cabecera)
-      """
         input_hsi_layout.addWidget(label_hsi)
         input_hsi_layout.addWidget(asterisk_label_hsi)
         input_hsi_layout.addWidget(input_hsi)
         input_hsi_layout.addWidget(button_hsi)
         
-        self.line_edits = [input_rgb_image, input_hsi]
+        input_white_hsi_layout.addWidget(label_white_hsi)
+        input_white_hsi_layout.addWidget(asterisk_label_white_hsi)
+        input_white_hsi_layout.addWidget(input_white_hsi)
+        input_white_hsi_layout.addWidget(button_white_hsi)
+
+
+        input_black_hsi_layout.addWidget(label_black_hsi)
+        input_black_hsi_layout.addWidget(asterisk_label_black_hsi)
+        input_black_hsi_layout.addWidget(input_black_hsi)
+        input_black_hsi_layout.addWidget(button_black_hsi)
+
+
+        columna_layout.addWidget(label_columna)
+        columna_layout.addWidget(asterisk_label_columna)
+        columna_layout.addWidget(input_columna)
+        columna_layout.addChildWidget(label_row)
+        self.line_edits = [input_rgb_image, input_hsi, input_white_hsi, input_black_hsi]
     
         import_form_layout.addLayout(input_rgb_image_layout)
         import_form_layout.addLayout(input_cabecera_layout)
         import_form_layout.addLayout(input_hsi_layout)
+        import_form_layout.addLayout(input_white_hsi_layout)
+        import_form_layout.addLayout(input_black_hsi_layout)
+        #import_form_layout.addLayout(columna_layout)
+
+        #import_form_layout.addLayout(input_black_hsi_layout)
+        #import_form_layout.addWidget(input_grid_config_layout)
+        #import_form_layout.addLayout(input_grid_row_column_layout)
         import_form_layout.addWidget(self.label_image_selected)
+
 
         # Botton importar imagen
         self.clean_button = QPushButton("Limpiar")
@@ -518,6 +592,26 @@ class MainWindow(QMainWindow):
                 print("Archivo seleccionado:", path)
                 line_edit.setText(path)
         return _button_open_hsi
+
+    def button_open_white_hsi(self, line_edit):
+        def _button_open_white_hsi():
+            path, _ = QFileDialog.getOpenFileName(self, "Abrir Archivo", ".","BIL files (*.bil)","BIL files (*.bil)")
+            if not path:
+                print("Archivo no seleccionado")
+            else:
+                print("Archivo seleccionado:", path)
+                line_edit.setText(path)
+        return _button_open_white_hsi
+    
+    def button_open_black_hsi(self, line_edit):
+        def _button_open_black_hsi():
+            path, _ = QFileDialog.getOpenFileName(self, "Abrir Archivo", ".","BIL files (*.bil)","BIL files (*.bil)")
+            if not path:
+                print("Archivo no seleccionado")
+            else:
+                print("Archivo seleccionado:", path)
+                line_edit.setText(path)
+        return _button_open_black_hsi
 
     def validate_filled_form(self):
         for line_edit in self.line_edits:
