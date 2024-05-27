@@ -9,7 +9,7 @@ El codigo fuente del proyecto esta estructurado de las siguiente manera.
 
 `utils.py` - Script de python que contiene las funciones principales para el procesamiento del software asi como funciones utilitarias.
 
-`icons` - Carpte donde se encuentran los iconos usados para la creacion de la interfaz de usuario.
+`icons` - Carpeta donde se encuentran los iconos usados para la creacion de la interfaz de usuario.
 
 
 ## Instalación Local
