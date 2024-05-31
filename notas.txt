@@ -1,0 +1,1 @@
+ver si podemos agregar lo del file en navegation bar y la parde se seprar el formulario en processing image, segmentation y calibration reflectancia

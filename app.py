@@ -14,6 +14,71 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import pandas as pd
+import time
+
+class CustomProgressBar(QProgressBar):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.custom_text = ""
+        self.start_time = time.time()
+        self.elapsed_time = 0
+        self.remaining_time = 0
+        self.setTextVisible(False)  # Ocultar el texto predeterminado
+        self.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid grey;
+                border-radius: 5px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #00FF00;  # Color verde
+                width: 20px;
+            }
+        """)
+
+    def set_custom_text(self, text):
+        self.custom_text = text
+        self.update()
+
+    def update_time(self, value):
+        current_time = time.time()
+        self.elapsed_time = current_time - self.start_time
+        if value > 0:
+            total_time = self.elapsed_time * 100 / value
+            self.remaining_time = total_time - self.elapsed_time
+        else:
+            self.remaining_time = 0
+
+        self.update()
+
+    def format_time(self, seconds):
+        if seconds >= 3600:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            return f"{hours}h {minutes}m"
+        elif seconds >= 60:
+            minutes = int(seconds // 60)
+            seconds = int(seconds % 60)
+            return f"{minutes}m {seconds}s"
+        else:
+            return f"{int(seconds)}s"
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        painter = QPainter(self)
+        rect = self.rect()
+        pen = painter.pen()
+        pen.setColor(Qt.black)
+        painter.setPen(pen)
+        
+        if not self.custom_text:
+            self.custom_text = f"{self.value()}%"
+        
+        remaining_time_text = f" - Tiempo restante: {self.format_time(self.remaining_time)}"
+        
+        painter.drawText(rect, Qt.AlignCenter, self.custom_text + remaining_time_text)
+        painter.end()
 
 
 class MatplotlibWidget(QWidget):
@@ -122,6 +187,38 @@ class Worker(QRunnable):
         self.signals.spectrum_data.emit(seeds_spectrum)
 
         self.signals.progress_changed.emit(100)
+
+class ProcessingForm(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.initUI()
+    
+    def initUI(self):
+        # Layout Principal del Fomulario de Importar Imagen
+        color_fondo = QColor(240, 240, 240)
+        #import_form_widget = QWidget()
+        procesing_form_layout = QVBoxLayout()
+        self.setLayout(procesing_form_layout) 
+        self.setMaximumSize(800, 16777215)
+        # Layout de cada campo del formulario
+        input_rgb_image_layout = QHBoxLayout()
+        input_cabecera_layout = QHBoxLayout()
+        input_hsi_layout  = QHBoxLayout()
+        input_white_hsi_layout  = QHBoxLayout()
+        input_black_hsi_layout  = QHBoxLayout()
+        columna_layout  = QHBoxLayout()
+        input_grid_config_layout  = QHBoxLayout()
+        input_grid_row_column_layout  = QHBoxLayout()
+        
+        #row_colum_layout = QHBoxLayout()
+        buttons_form_layout = QHBoxLayout()
+        
+        # Establecer fondo para el formulario
+        #import_form_widget.setAutoFillBackground(True)
+        #p = import_form_widget.palette()
+        #p.setColor(import_form_widget.backgroundRole(), color_fondo)
+        #import_form_widget.setPalette(p)
+        
 
 
 class ImageGridWidget(QWidget):
@@ -367,11 +464,14 @@ class MainWindow(QMainWindow):
 
         import_form_layout.addLayout(buttons_form_layout)
         
-        self.progress_bar = QProgressBar()
+        self.progress_bar = CustomProgressBar(self)
+        self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        import_form_layout.addWidget(self.progress_bar)
+        
+        #import_form_layout.addWidget(self.progress_bar)
 
         main_layout.addWidget(import_form_widget)
+        #main_layout.addWidget(self.progress_bar)
         main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
         
         # Vista de las semillas identificadas
@@ -518,7 +618,10 @@ class MainWindow(QMainWindow):
             self.masks_tab.add_image(mask_black_frame, row, column, i)
 
     def update_progress(self, value):
+        text = f"Progreso: {value}% completado"
         self.progress_bar.setValue(value)
+        self.progress_bar.set_custom_text(text)
+        self.progress_bar.update_time(value)
 
 
     def button_show_spectrum(self):
