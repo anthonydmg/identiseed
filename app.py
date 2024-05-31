@@ -188,6 +188,24 @@ class Worker(QRunnable):
 
         self.signals.progress_changed.emit(100)
 
+class FileInput(QWidget):
+    def __init__(self, 
+                 label_input,
+                 color_texto = QColor(0, 0, 0),
+                 color_boton = QColor(0,0,0)
+                 ):
+        super().__init__()
+
+    
+    def initUI(self, label_input, color_texto, color_boton):
+        label_input = QLabel(label_input)
+        label_input.setStyleSheet("color: {};".format(color_texto.name()))
+        path_input = QLineEdit()
+        selection_button = QPushButton("Seleccionar")
+        selection_button.clicked.connect(self.button_open_file(path_input))
+        selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+    
+        return
 class ProcessingForm(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -214,10 +232,11 @@ class ProcessingForm(QWidget):
         buttons_form_layout = QHBoxLayout()
         
         # Establecer fondo para el formulario
-        #import_form_widget.setAutoFillBackground(True)
-        #p = import_form_widget.palette()
-        #p.setColor(import_form_widget.backgroundRole(), color_fondo)
-        #import_form_widget.setPalette(p)
+        self.setAutoFillBackground(True)
+        p = self.palette()
+        p.setColor(self.backgroundRole(), color_fondo)
+        self.setPalette(p)
+
         
 
 
