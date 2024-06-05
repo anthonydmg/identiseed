@@ -206,12 +206,18 @@ class FileInput(QWidget):
         selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
     
         return
-class ProcessingForm(QWidget):
-    def __init__(self) -> None:
-        super().__init__()
-        self.initUI()
     
-    def initUI(self):
+class ProcessingForm(QWidget):
+    def __init__(self,  
+                 color_boton = QColor(0, 70, 70), 
+                 color_texto = QColor(0, 0, 0)):
+        super().__init__()
+
+        self.line_edits = []
+        self.initUI(color_boton, color_texto)
+    
+    def initUI(self, color_boton = QColor(0, 70, 70), 
+                 color_texto = QColor(0, 0, 0)):
         # Layout Principal del Fomulario de Importar Imagen
         color_fondo = QColor(240, 240, 240)
         #import_form_widget = QWidget()
@@ -219,25 +225,129 @@ class ProcessingForm(QWidget):
         self.setLayout(procesing_form_layout) 
         self.setMaximumSize(800, 16777215)
         # Layout de cada campo del formulario
-        input_rgb_image_layout = QHBoxLayout()
-        input_cabecera_layout = QHBoxLayout()
-        input_hsi_layout  = QHBoxLayout()
-        input_white_hsi_layout  = QHBoxLayout()
-        input_black_hsi_layout  = QHBoxLayout()
-        columna_layout  = QHBoxLayout()
-        input_grid_config_layout  = QHBoxLayout()
-        input_grid_row_column_layout  = QHBoxLayout()
         
-        #row_colum_layout = QHBoxLayout()
+        self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
+
+        self.label_rgb_image, self.input_rgb_image, _ = self.add_file_input(
+                            main_layout = procesing_form_layout, 
+                            required = True,
+                            label_text="Imagen RGB (.tiff)",
+                            fn_load_file = self.load_rgb_image,
+                            color_boton = color_boton,
+                            color_texto= color_texto)
+        
+        
+        self.label_hsi, self.input_hsi, _ = self.add_file_input(
+                            main_layout = procesing_form_layout,
+                            required = True, 
+                            label_text="Imagen Hiperspectral (.bil)",
+                            color_boton = color_boton,
+                            color_texto= color_texto)
+        
+
+        self.label_white_hsi, self.input_white_hsi, _ = self.add_file_input(
+                            main_layout = procesing_form_layout, 
+                            required = True,
+                            label_text="Blanco de Referencia (.bil)",
+                            color_boton = color_boton,
+                            color_texto= color_texto)
+        
+
+        self.label_black_hsi, self.input_black_hsi, _ = self.add_file_input(
+                            main_layout = procesing_form_layout,
+                            required = True, 
+                            label_text="Negro de Referencia (.bil)",
+                            color_boton = color_boton,
+                            color_texto= color_texto)
+
+
+
+        procesing_form_layout.addWidget(self.label_image_selected)
+
         buttons_form_layout = QHBoxLayout()
+        # Botton importar imagen
+        self.clean_button = QPushButton("Limpiar")
+        self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        buttons_form_layout.addWidget(self.clean_button)
         
+        #self.clean_button.clicked.connect(self.clean_form)
+        
+        #Boton de Limpiar formulario
+        self.processing_button = QPushButton("Procesar")
+        self.processing_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        buttons_form_layout.addWidget(self.processing_button)
+        #self.import_button.clicked.connect(self.process_image)
+
+        procesing_form_layout.addLayout(buttons_form_layout)
+
         # Establecer fondo para el formulario
         self.setAutoFillBackground(True)
         p = self.palette()
         p.setColor(self.backgroundRole(), color_fondo)
         self.setPalette(p)
-
+    
+    def add_file_input(self,
+                        main_layout,
+                        label_text,
+                        required = False,
+                        color_texto = QColor(0, 0, 0),
+                        color_boton = QColor(0,0,0),
+                        fn_load_file = None):
         
+        input_layout = QHBoxLayout()
+        label = QLabel(label_text)
+        label.setStyleSheet("color: {};".format(color_texto.name()))
+        input = QLineEdit()
+        selection_button = QPushButton("Seleccionar")
+        selection_button.clicked.connect(self.button_open_file(input, fn_load_file))
+        
+        selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        
+        input_layout.addWidget(label)
+        
+        if required:
+            asterisk_label = QLabel("*")
+            asterisk_label.setStyleSheet("color: red;")
+            asterisk_label.setFont(QFont("Arial", 12, QFont.Bold))
+            input_layout.addWidget(asterisk_label)
+        
+        input_layout.addWidget(input)
+        input_layout.addWidget(selection_button)
+
+        main_layout.addLayout(input_layout)
+
+        self.line_edits.append({"input": input, "required": required})
+        
+        return label, input, selection_button
+    
+
+    def button_open_file(self, input, fn_load_file = None):
+        def _button_open_file():
+            path, _ = QFileDialog.getOpenFileName(self, "Abrir Archivo", ".","Tiff files (*.tif)","Tiff files (*.tif)")
+            
+            if not path:
+                print("Archivo no seleccionado")
+            else:
+                print("Archivo seleccionado:", path)
+                input.setText(path)
+                ## Cargar y mostrar image
+                
+                if fn_load_file is not None:
+                    fn_load_file(path)
+
+        return _button_open_file
+
+    def load_rgb_image(self, path):
+        pixmap = QPixmap(path)
+        self.label_image_selected.setPixmap(pixmap.scaled(600,600, Qt.KeepAspectRatio))
+    
+
+    def validate_filled_form(self):
+        for line_edit in self.line_edits:
+            if line_edit["input"].text().strip() == "" and line_edit["required"]:
+                QMessageBox.warning(self, "Campos Vacios","Por favor, llene todos los campos requeridos.")
+                return False
+        return True
 
 
 class ImageGridWidget(QWidget):
@@ -487,9 +597,13 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         
-        #import_form_layout.addWidget(self.progress_bar)
+        import_form_layout.addWidget(self.progress_bar)
 
         main_layout.addWidget(import_form_widget)
+
+        #processing_form_widget =  ProcessingForm()
+        #main_layout.addWidget(processing_form_widget)
+        
         #main_layout.addWidget(self.progress_bar)
         main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
         
@@ -761,6 +875,26 @@ class MainWindow(QMainWindow):
         worker.signals.spectrum_data.connect(self.recive_spectrum_data)
         
         self.threadpool.start(worker)
+
+    def process_image(self):
+        #self.import_button.setEnabled(False)
+        #self.progress_bar.setValue(0)
+
+        #success_validate = self.validate_filled_form()
+        #print("success_validate:", success_validate)
+        #if not success_validate:
+        #    return
+        
+        #path_rgb_image = self.line_edits[0].text()
+        #path_hypespect_image = self.line_edits[2].text()
+
+        #self.thread_process = QThread()
+        """ worker = Worker(path_rgb_image, path_hypespect_image)
+        worker.signals.progress_changed.connect(self.update_progress)
+        worker.signals.images_masks.connect(self.show_images_masks)
+        worker.signals.spectrum_data.connect(self.recive_spectrum_data)
+        
+        self.threadpool.start(worker) """
 
     def recive_spectrum_data(self, spectrum_data):
         self.spectrum_data = spectrum_data
