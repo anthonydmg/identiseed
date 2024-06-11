@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QLabel, QToolBar, QStatusBar, QCheckBox, 
     QPushButton, QDialog, QDialogButtonBox, 
     QVBoxLayout, QMessageBox, QFileDialog,
-    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar
+    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar, QFrame, QComboBox, QSpinBox
 )
 from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
 from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool
@@ -15,6 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import pandas as pd
 import time
+from enum import Enum
 
 class CustomProgressBar(QProgressBar):
     def __init__(self, *args, **kwargs):
@@ -206,7 +207,20 @@ class FileInput(QWidget):
         selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
     
         return
-    
+
+class FontType(Enum):
+    MAIN_TITLE = QFont("Roboto", 24, QFont.Bold)
+    SECTION_TITLE = QFont("Roboto", 16, QFont.Medium)
+    SUBSECTION_TITLE = QFont("Roboto", 14, QFont.Normal)
+
+    def __call__(self):
+        return self.value
+
+class Styles:
+    MAIN_TITLE = "color: #333333"
+    SECTION_TITLE = "color: #555555"
+    SUBSECTION_TITLE = "color: #999999"
+
 class ProcessingForm(QWidget):
     def __init__(self,  
                  color_boton = QColor(0, 70, 70), 
@@ -216,18 +230,33 @@ class ProcessingForm(QWidget):
         self.line_edits = []
         self.initUI(color_boton, color_texto)
     
-    def initUI(self, color_boton = QColor(0, 70, 70), 
-                 color_texto = QColor(0, 0, 0)):
+    def initUI(self, 
+                color_boton = QColor(0, 70, 70), 
+                color_texto = QColor(0, 0, 0)):
         # Layout Principal del Fomulario de Importar Imagen
         color_fondo = QColor(240, 240, 240)
         #import_form_widget = QWidget()
         procesing_form_layout = QVBoxLayout()
-        self.setLayout(procesing_form_layout) 
+        
+        
+        procesing_form_layout.setContentsMargins(10,10,10,10)
+        procesing_form_layout.setSpacing(10)
+        procesing_form_layout.setAlignment(Qt.AlignTop)
+        
+        self.setLayout(procesing_form_layout)
+
         self.setMaximumSize(800, 16777215)
         # Layout de cada campo del formulario
         
         self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
 
+        # Seccion seleccion de imagen
+        settings_header = QLabel("Configuración de Extracción de Caracteristicas")
+        settings_header.setStyleSheet(Styles.SECTION_TITLE)
+        settings_header.setFont(FontType.SECTION_TITLE())
+
+        procesing_form_layout.addWidget(settings_header)
+        
         self.label_rgb_image, self.input_rgb_image, _ = self.add_file_input(
                             main_layout = procesing_form_layout, 
                             required = True,
@@ -243,7 +272,15 @@ class ProcessingForm(QWidget):
                             label_text="Imagen Hiperspectral (.bil)",
                             color_boton = color_boton,
                             color_texto= color_texto)
-        
+        # Linea separadora
+
+        self.add_separator_line(main_layout = procesing_form_layout)
+
+        # Seccion de calibracion
+        calibration_sub_header = QLabel("Calibracion de Reflactancia")
+        calibration_sub_header.setStyleSheet(Styles.SECTION_TITLE)
+        calibration_sub_header.setFont(FontType.SECTION_TITLE())
+        procesing_form_layout.addWidget(calibration_sub_header)
 
         self.label_white_hsi, self.input_white_hsi, _ = self.add_file_input(
                             main_layout = procesing_form_layout, 
@@ -260,20 +297,79 @@ class ProcessingForm(QWidget):
                             color_boton = color_boton,
                             color_texto= color_texto)
 
+        self.add_separator_line(main_layout = procesing_form_layout)
+        # Seccion de Opciones de de Procesamiento
+        options_process_sub_header = QLabel("Opciones de Procesamiento")
+        options_process_sub_header.setStyleSheet(Styles.SECTION_TITLE)
+        options_process_sub_header.setFont(FontType.SECTION_TITLE())
+        procesing_form_layout.addWidget(options_process_sub_header)
+        
+        method_layout = QHBoxLayout()
 
+        seg_method_label = QLabel("Metodo de Segmentacion:")
 
+        method_combo_box = QComboBox()
+        method_combo_box.addItems(["Filtrado por color"])
+        method_combo_box.setEnabled(False)
+        method_layout.addWidget(seg_method_label)
+        method_layout.addWidget(method_combo_box)
+
+        procesing_form_layout.addLayout(method_layout)
+
+        threshold_label = QLabel("Umbral de color (HSV)")
+
+        procesing_form_layout.addWidget(threshold_label)
+
+        hue_layout = QHBoxLayout()
+
+        hue_label = QLabel("Hue:")
+        min_hue_label = QLabel("Min:")
+        
+        min_hue_spin_box = QSpinBox()
+        min_hue_spin_box.setMinimum(0)
+        min_hue_spin_box.setMaximum(255)
+        min_hue_spin_box.setValue(10)
+
+        max_hue_label = QLabel("Max:")
+
+        max_hue_spin_box = QSpinBox()
+        max_hue_spin_box.setMinimum(0)
+        max_hue_spin_box.setMaximum(255)
+        max_hue_spin_box.setValue(10)
+
+        hue_layout.addWidget(hue_label)
+        hue_layout.addWidget(min_hue_label)
+        hue_layout.addWidget(min_hue_spin_box)
+
+        hue_layout.addWidget(max_hue_label)
+        hue_layout.addWidget(max_hue_spin_box)
+
+        
+        procesing_form_layout.addLayout(hue_layout)
+
+        saturation_label = QLabel("Saturation:")
+        value_label = QLabel("Value:")
+        
+
+        
+        
+        #method_layout.addWidget(seg_method_label)
+
+    
         procesing_form_layout.addWidget(self.label_image_selected)
 
         buttons_form_layout = QHBoxLayout()
         # Botton importar imagen
-        self.clean_button = QPushButton("Limpiar")
+        self.clean_button = QPushButton("Cancelar")
+
+
         self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         buttons_form_layout.addWidget(self.clean_button)
         
         #self.clean_button.clicked.connect(self.clean_form)
         
         #Boton de Limpiar formulario
-        self.processing_button = QPushButton("Procesar")
+        self.processing_button = QPushButton("Aplicar")
         self.processing_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         buttons_form_layout.addWidget(self.processing_button)
         #self.import_button.clicked.connect(self.process_image)
@@ -286,6 +382,13 @@ class ProcessingForm(QWidget):
         p.setColor(self.backgroundRole(), color_fondo)
         self.setPalette(p)
     
+    def add_separator_line(self, main_layout):
+        line = QFrame()
+
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        main_layout.addWidget(line)
+
     def add_file_input(self,
                         main_layout,
                         label_text,
@@ -601,8 +704,8 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(import_form_widget)
 
-        #processing_form_widget =  ProcessingForm()
-        #main_layout.addWidget(processing_form_widget)
+        processing_form_widget =  ProcessingForm()
+        main_layout.addWidget(processing_form_widget)
         
         #main_layout.addWidget(self.progress_bar)
         main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
