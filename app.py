@@ -219,7 +219,7 @@ class FontType(Enum):
 class Styles:
     MAIN_TITLE = "color: #333333"
     SECTION_TITLE = "color: #555555"
-    SUBSECTION_TITLE = "color: #999999"
+    SUBSECTION_TITLE = "color: #777777"
 
 class ProcessingForm(QWidget):
     def __init__(self,  
@@ -248,13 +248,12 @@ class ProcessingForm(QWidget):
         self.setMaximumSize(800, 16777215)
         # Layout de cada campo del formulario
         
-        self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
 
         # Seccion seleccion de imagen
         settings_header = QLabel("Configuración de Extracción de Caracteristicas")
         settings_header.setStyleSheet(Styles.SECTION_TITLE)
         settings_header.setFont(FontType.SECTION_TITLE())
-
+        
         procesing_form_layout.addWidget(settings_header)
         
         self.label_rgb_image, self.input_rgb_image, _ = self.add_file_input(
@@ -265,7 +264,10 @@ class ProcessingForm(QWidget):
                             color_boton = color_boton,
                             color_texto= color_texto)
         
-        
+        self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
+        self.label_image_selected.setVisible(False)
+        procesing_form_layout.addWidget(self.label_image_selected)
+
         self.label_hsi, self.input_hsi, _ = self.add_file_input(
                             main_layout = procesing_form_layout,
                             required = True, 
@@ -319,10 +321,15 @@ class ProcessingForm(QWidget):
         threshold_label = QLabel("Umbral de color (HSV)")
 
         procesing_form_layout.addWidget(threshold_label)
-
+        ## entrada de Hue 
         hue_layout = QHBoxLayout()
 
-        hue_label = QLabel("Hue:")
+        hue_label = QLabel("Tono (H):")
+
+        min_hue_layout = QHBoxLayout()
+
+        min_hue_layout.setAlignment(Qt.AlignLeft)
+
         min_hue_label = QLabel("Min:")
         
         min_hue_spin_box = QSpinBox()
@@ -330,6 +337,12 @@ class ProcessingForm(QWidget):
         min_hue_spin_box.setMaximum(255)
         min_hue_spin_box.setValue(10)
 
+        min_hue_layout.addWidget(min_hue_label)
+        min_hue_layout.addWidget(min_hue_spin_box)
+        
+        max_hue_layout = QHBoxLayout()
+        max_hue_layout.setAlignment(Qt.AlignLeft)
+        
         max_hue_label = QLabel("Max:")
 
         max_hue_spin_box = QSpinBox()
@@ -337,41 +350,141 @@ class ProcessingForm(QWidget):
         max_hue_spin_box.setMaximum(255)
         max_hue_spin_box.setValue(10)
 
+        max_hue_layout.addWidget(max_hue_label)
+        max_hue_layout.addWidget(max_hue_spin_box)
+
         hue_layout.addWidget(hue_label)
-        hue_layout.addWidget(min_hue_label)
-        hue_layout.addWidget(min_hue_spin_box)
-
-        hue_layout.addWidget(max_hue_label)
-        hue_layout.addWidget(max_hue_spin_box)
-
+        hue_layout.addLayout(min_hue_layout)
+        hue_layout.addLayout(max_hue_layout)
         
         procesing_form_layout.addLayout(hue_layout)
 
-        saturation_label = QLabel("Saturation:")
-        value_label = QLabel("Value:")
-        
+        ## entrada de Saturation 
+        saturation_layout = QHBoxLayout()
 
-        
-        
-        #method_layout.addWidget(seg_method_label)
+        saturation_label = QLabel("Saturación (S):")
 
-    
-        procesing_form_layout.addWidget(self.label_image_selected)
+        min_saturation_layout = QHBoxLayout()
+        min_saturation_layout.setAlignment(Qt.AlignLeft)
+        
+        min_saturation_label = QLabel("Min:")
+        
+        min_saturation_spin_box = QSpinBox()
+        min_saturation_spin_box.setMinimum(0)
+        min_saturation_spin_box.setMaximum(255)
+        min_saturation_spin_box.setValue(10)
+
+        min_saturation_layout.addWidget(min_saturation_label)
+        min_saturation_layout.addWidget(min_saturation_spin_box)
+        
+        max_saturation_layout = QHBoxLayout()
+        max_saturation_layout.setAlignment(Qt.AlignLeft)
+        
+        max_saturation_label = QLabel("Max:")
+
+        max_saturation_spin_box = QSpinBox()
+        max_saturation_spin_box.setMinimum(0)
+        max_saturation_spin_box.setMaximum(255)
+        max_saturation_spin_box.setValue(10)
+
+        max_saturation_layout.addWidget(max_saturation_label)
+        max_saturation_layout.addWidget(max_saturation_spin_box)
+
+        saturation_layout.addWidget(saturation_label)
+        saturation_layout.addLayout(min_saturation_layout)
+
+
+        saturation_layout.addLayout(max_saturation_layout)
+        
+        procesing_form_layout.addLayout(saturation_layout)
+
+
+        ## entrada de Saturation 
+        value_layout = QHBoxLayout()
+        value_label = QLabel("Brillo (V):")
+
+        min_value_layout = QHBoxLayout()
+        min_value_layout.setAlignment(Qt.AlignLeft)
+
+        min_value_label = QLabel("Min:")
+        
+        min_value_spin_box = QSpinBox()
+        min_value_spin_box.setMinimum(0)
+        min_value_spin_box.setMaximum(255)
+        min_value_spin_box.setValue(10)
+
+        min_value_layout.addWidget(min_value_label)
+        min_value_layout.addWidget(min_value_spin_box)
+        
+        max_value_layout = QHBoxLayout()
+        max_value_layout.setAlignment(Qt.AlignLeft)
+        
+        max_value_label = QLabel("Max:")
+
+        max_value_spin_box = QSpinBox()
+        max_value_spin_box.setMinimum(0)
+        max_value_spin_box.setMaximum(255)
+        max_value_spin_box.setValue(10)
+
+        max_value_layout.addWidget(max_value_label)
+        max_value_layout.addWidget(max_value_spin_box)
+
+        value_layout.addWidget(value_label)
+        value_layout.addLayout(min_value_layout)
+
+        value_layout.addLayout(max_value_layout)
+        
+        procesing_form_layout.addLayout(value_layout)
+
+        grid_label = QLabel("Grilla de Semillas")
+        grid_label.setFont(FontType.SUBSECTION_TITLE())
+        grid_label.setStyleSheet(Styles.SUBSECTION_TITLE)
+
+        procesing_form_layout.addWidget(grid_label)
+
+        num_columns_layout = QHBoxLayout()
+        num_columns_layout.setAlignment(Qt.AlignLeft)
+
+        num_columns_label = QLabel("Num. Columnas:")
+
+        num_columns_spin_box = QSpinBox()
+        num_columns_spin_box.setMinimum(0)
+        num_columns_spin_box.setMaximum(50)
+        num_columns_spin_box.setValue(5)
+
+        num_columns_layout.addWidget(num_columns_label)
+        num_columns_layout.addWidget(num_columns_spin_box)
+
+        num_row_layout = QHBoxLayout()
+        num_row_layout.setAlignment(Qt.AlignLeft)
+
+        num_row_label = QLabel("Num. Filas:")
+
+        num_row_spin_box = QSpinBox()
+        num_row_spin_box.setMinimum(0)
+        num_row_spin_box.setMaximum(50)
+        num_row_spin_box.setValue(5)
+
+        num_row_layout.addWidget(num_row_label)
+        num_row_layout.addWidget(num_row_spin_box)
+        
+        procesing_form_layout.addLayout(num_columns_layout)
+        procesing_form_layout.addLayout(num_row_layout)
 
         buttons_form_layout = QHBoxLayout()
         # Botton importar imagen
         self.clean_button = QPushButton("Cancelar")
-
 
         self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         buttons_form_layout.addWidget(self.clean_button)
         
         #self.clean_button.clicked.connect(self.clean_form)
         
-        #Boton de Limpiar formulario
+        #Boton de Aplicar formulario
         self.processing_button = QPushButton("Aplicar")
         self.processing_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         buttons_form_layout.addWidget(self.processing_button)
+
         #self.import_button.clicked.connect(self.process_image)
 
         procesing_form_layout.addLayout(buttons_form_layout)
@@ -442,7 +555,8 @@ class ProcessingForm(QWidget):
 
     def load_rgb_image(self, path):
         pixmap = QPixmap(path)
-        self.label_image_selected.setPixmap(pixmap.scaled(600,600, Qt.KeepAspectRatio))
+        self.label_image_selected.setPixmap(pixmap.scaled(200,200, Qt.KeepAspectRatio))
+        self.label_image_selected.setVisible(True)
     
 
     def validate_filled_form(self):
