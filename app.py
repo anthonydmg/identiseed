@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QLabel, QToolBar, QStatusBar, QCheckBox, 
     QPushButton, QDialog, QDialogButtonBox, 
     QVBoxLayout, QMessageBox, QFileDialog,
-    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar, QFrame, QComboBox, QSpinBox
+    QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar, QFrame, QComboBox, QSpinBox, QToolButton
 )
 from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
 from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool
@@ -222,22 +222,22 @@ class Styles:
     SUBSECTION_TITLE = "color: #777777"
 
 class ProcessingForm(QWidget):
-    def __init__(self,  
-                 color_boton = QColor(0, 70, 70), 
+    def __init__(self,
+                 parent = None,  
+                 color_boton = None, 
                  color_texto = QColor(0, 0, 0)):
-        super().__init__()
+        super(ProcessingForm, self).__init__(parent)
 
         self.line_edits = []
         self.initUI(color_boton, color_texto)
     
     def initUI(self, 
-                color_boton = QColor(0, 70, 70), 
+                color_boton = None, 
                 color_texto = QColor(0, 0, 0)):
         # Layout Principal del Fomulario de Importar Imagen
-        color_fondo = QColor(240, 240, 240)
+        color_fondo = QColor(250, 250, 250)
         #import_form_widget = QWidget()
         procesing_form_layout = QVBoxLayout()
-        
         
         procesing_form_layout.setContentsMargins(10,10,10,10)
         procesing_form_layout.setSpacing(10)
@@ -246,8 +246,9 @@ class ProcessingForm(QWidget):
         self.setLayout(procesing_form_layout)
 
         self.setMaximumSize(800, 16777215)
-        # Layout de cada campo del formulario
+
         
+        # Layout de cada campo del formulario
 
         # Seccion seleccion de imagen
         settings_header = QLabel("Configuración de Extracción de Caracteristicas")
@@ -471,23 +472,22 @@ class ProcessingForm(QWidget):
         procesing_form_layout.addLayout(num_columns_layout)
         procesing_form_layout.addLayout(num_row_layout)
 
-        buttons_form_layout = QHBoxLayout()
+        #buttons_form_layout = QHBoxLayout()
         # Botton importar imagen
-        self.clean_button = QPushButton("Cancelar")
+        #self.clean_button = QPushButton("Cancelar")
 
-        self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        buttons_form_layout.addWidget(self.clean_button)
+        #self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #buttons_form_layout.addWidget(self.clean_button)
         
-        #self.clean_button.clicked.connect(self.clean_form)
         
         #Boton de Aplicar formulario
-        self.processing_button = QPushButton("Aplicar")
-        self.processing_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        buttons_form_layout.addWidget(self.processing_button)
+        #self.processing_button = QPushButton("Aplicar")
+        #self.processing_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #buttons_form_layout.addWidget(self.processing_button)
 
         #self.import_button.clicked.connect(self.process_image)
 
-        procesing_form_layout.addLayout(buttons_form_layout)
+        #procesing_form_layout.addLayout(buttons_form_layout)
 
         # Establecer fondo para el formulario
         self.setAutoFillBackground(True)
@@ -507,7 +507,7 @@ class ProcessingForm(QWidget):
                         label_text,
                         required = False,
                         color_texto = QColor(0, 0, 0),
-                        color_boton = QColor(0,0,0),
+                        color_boton = None,
                         fn_load_file = None):
         
         input_layout = QHBoxLayout()
@@ -517,7 +517,8 @@ class ProcessingForm(QWidget):
         selection_button = QPushButton("Seleccionar")
         selection_button.clicked.connect(self.button_open_file(input, fn_load_file))
         
-        selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        if color_boton is not None:
+            selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         
         input_layout.addWidget(label)
         
@@ -565,6 +566,7 @@ class ProcessingForm(QWidget):
                 QMessageBox.warning(self, "Campos Vacios","Por favor, llene todos los campos requeridos.")
                 return False
         return True
+
 
 
 class ImageGridWidget(QWidget):
@@ -635,6 +637,42 @@ class ImageGridWidget(QWidget):
     def get_images_clicked_status(self):
         return self.image_labels
 
+class PanelFileInformation(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.initUI()
+    
+    def initUI(self):
+        main_layout = QVBoxLayout()
+        main_layout.setAlignment(Qt.AlignTop)
+        title_panel = QLabel("Panel de Informacion")
+        title_panel.setFont(FontType.MAIN_TITLE())
+        main_layout.addWidget(title_panel)
+        
+        info_file_image_label = QLabel("Informacion del Archivo de Image")
+        info_file_image_label.setFont(FontType.SUBSECTION_TITLE())
+        resolution_field_label = QLabel("Resolucion:")
+        type_file_field_label = QLabel("Tipo de archivo:")
+
+       
+        main_layout.addWidget(info_file_image_label)
+        main_layout.addWidget(resolution_field_label)
+        main_layout.addWidget(type_file_field_label)
+
+        info_file_hsi_label = QLabel("Informacion del Archivo de Image")
+        info_file_hsi_label.setFont(FontType.SUBSECTION_TITLE())
+        spectral_range_label = QLabel("Rango Espectral:")
+        num_bands_label = QLabel("Numero de Bandas:")
+        type_file_hsi_field_label = QLabel("Tipo de archivo:")
+
+        main_layout.addWidget(info_file_hsi_label)
+        main_layout.addWidget(spectral_range_label)
+        main_layout.addWidget(num_bands_label)
+        main_layout.addWidget(type_file_hsi_field_label)
+
+        self.setLayout(main_layout)
+        #pass
+
 class MainWindow(QMainWindow):
 
     def __init__(self):
@@ -650,176 +688,214 @@ class MainWindow(QMainWindow):
         # Main Layout Principal
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(20,20,20,20)
+
+        ## Menu
+        menu = self.menuBar()
+        file_menu = menu.addMenu("Archivo")
+        button_action_file1 = QAction("Guardar datos espectrales", self)
+        button_action_file1.setStatusTip("Guardar Datos Espectrales")
+        button_action_file1.triggered.connect(self.on_save_data_spectral)
+        file_menu.addAction(button_action_file1)
+
+        process_menu = menu.addMenu("Procesamiento")
+        button_action_process1 = QAction("Extraccion de Caracteristicas", self)
+        button_action_process1.setStatusTip("Extraccion de Caracteristicas")
+        button_action_process1.triggered.connect(self.on_extract_spectral_feactures)
+        process_menu.addAction(button_action_process1)
+
+        help_menu = menu.addMenu("Ayuda")
+        button_action_help1 = QAction("Manual", self)
+        button_action_help1.setStatusTip("Manual")
+        button_action_help1.triggered.connect(self.on_dowload_manual)
+        help_menu.addAction(button_action_help1)
         
         
+       
+        
+           # Vista de las semillas identificadas
+        self.image_information_seccion_widget = QWidget()
+      
+        self.image_information_seccion_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
+
+        image_information_layout = QVBoxLayout(self.image_information_seccion_widget)
+
+
+        panel_file_info_widget = PanelFileInformation()
+
+        panel_file_info_widget_2 = PanelFileInformation()
+        image_information_layout.addWidget(panel_file_info_widget)
+        image_information_layout.addWidget(panel_file_info_widget_2)
+
+        # Crear acciones
+
         # Layout Principal del Fomulario de Importar Imagen
-        import_form_widget = QWidget()
-        import_form_layout = QVBoxLayout(import_form_widget)
-        import_form_widget.setMaximumSize(800, 16777215)
+        #import_form_widget = QWidget()
+        #import_form_layout = QVBoxLayout(import_form_widget)
+        #import_form_widget.setMaximumSize(800, 16777215)
         # Layout de cada campo del formulario
-        input_rgb_image_layout = QHBoxLayout()
-        input_cabecera_layout = QHBoxLayout()
-        input_hsi_layout  = QHBoxLayout()
-        input_white_hsi_layout  = QHBoxLayout()
-        input_black_hsi_layout  = QHBoxLayout()
-        columna_layout  = QHBoxLayout()
-        input_grid_config_layout  = QHBoxLayout()
-        input_grid_row_column_layout  = QHBoxLayout()
+        #input_rgb_image_layout = QHBoxLayout()
+        #input_cabecera_layout = QHBoxLayout()
+        #input_hsi_layout  = QHBoxLayout()
+        #input_white_hsi_layout  = QHBoxLayout()
+        #input_black_hsi_layout  = QHBoxLayout()
+        #columna_layout  = QHBoxLayout()
+        #input_grid_config_layout  = QHBoxLayout()
+        #input_grid_row_column_layout  = QHBoxLayout()
         
         #row_colum_layout = QHBoxLayout()
-        buttons_form_layout = QHBoxLayout()
+        #buttons_form_layout = QHBoxLayout()
         
         # Establecer fondo para el formulario
-        import_form_widget.setAutoFillBackground(True)
-        p = import_form_widget.palette()
-        p.setColor(import_form_widget.backgroundRole(), color_fondo)
-        import_form_widget.setPalette(p)
+        #import_form_widget.setAutoFillBackground(True)
+        #p = import_form_widget.palette()
+        #p.setColor(import_form_widget.backgroundRole(), color_fondo)
+        #import_form_widget.setPalette(p)
         
-        label_dist_grid_image = QLabel("Distribucion de grilla de semillas")
-        label_dist_grid_image.setStyleSheet("color: {};".format(color_texto.name()))
+        #label_dist_grid_image = QLabel("Distribucion de grilla de semillas")
+        #label_dist_grid_image.setStyleSheet("color: {};".format(color_texto.name()))
         
         #input_grid_config_layout.addWidget(label_dist_grid_image)
 
-        label_row_grid = QLabel("Numero de Filas:")
-        label_row_grid.setStyleSheet("color: {};".format(color_texto.name()))
-        input_row_grid = QLineEdit()
+        #label_row_grid = QLabel("Numero de Filas:")
+        #label_row_grid.setStyleSheet("color: {};".format(color_texto.name()))
+        #input_row_grid = QLineEdit()
         
-        row_colum_widget = QWidget()
-        row_colum_layout = QHBoxLayout(row_colum_widget)
+        #row_colum_widget = QWidget()
+        #row_colum_layout = QHBoxLayout(row_colum_widget)
         #row_colum_widget.setMaximumHeight(100)
 
-        label_colum_grid = QLabel("Numero de Columnas:")
-        label_colum_grid.setStyleSheet("color: {};".format(color_texto.name()))
-        input_colum_grid = QLineEdit()
+        #label_colum_grid = QLabel("Numero de Columnas:")
+        #label_colum_grid.setStyleSheet("color: {};".format(color_texto.name()))
+        #input_colum_grid = QLineEdit()
 
-        row_colum_layout.addWidget(label_row_grid)
-        row_colum_layout.addWidget(input_row_grid)
-        row_colum_layout.addWidget(label_colum_grid)
-        row_colum_layout.addWidget(input_colum_grid)
+        #row_colum_layout.addWidget(label_row_grid)
+        #row_colum_layout.addWidget(input_row_grid)
+        #row_colum_layout.addWidget(label_colum_grid)
+        #row_colum_layout.addWidget(input_colum_grid)
 
         
       
-        input_grid_row_column_layout.addWidget(row_colum_widget)
+        #input_grid_row_column_layout.addWidget(row_colum_widget)
         #input_grid_config_layout.addWidget(row_colum_widget)
 
-        label_rgb_image = QLabel("Imagen RGB (.tiff)")
-        label_rgb_image.setStyleSheet("color: {};".format(color_texto.name()))
-        input_rgb_image = QLineEdit()
-        button_rgb_image = QPushButton("Seleccionar")
-        button_rgb_image.clicked.connect(self.button_open_rgb_imge(input_rgb_image))
-        button_rgb_image.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #label_rgb_image = QLabel("Imagen RGB (.tiff)")
+        #label_rgb_image.setStyleSheet("color: {};".format(color_texto.name()))
+        #input_rgb_image = QLineEdit()
+        #button_rgb_image = QPushButton("Seleccionar")
+        #button_rgb_image.clicked.connect(self.button_open_rgb_imge(input_rgb_image))
+        #button_rgb_image.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
 
-        asterisk_label_rbg = QLabel("*")
-        asterisk_label_rbg.setStyleSheet("color: red;")
-        asterisk_label_rbg.setFont(QFont("Arial", 12, QFont.Bold))
+        #asterisk_label_rbg = QLabel("*")
+        #asterisk_label_rbg.setStyleSheet("color: red;")
+        #asterisk_label_rbg.setFont(QFont("Arial", 12, QFont.Bold))
 
-        label_hsi = QLabel("Imagen Hiperspectral (.bil)")
-        input_hsi = QLineEdit()
-        button_hsi = QPushButton("Seleccionar")
-        button_hsi.clicked.connect(self.button_open_hsi(input_hsi))
-        button_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        asterisk_label_hsi = QLabel("*")
-        asterisk_label_hsi.setStyleSheet("color: red;")
-        asterisk_label_hsi.setFont(QFont("Arial", 12, QFont.Bold))
-
-
-        label_white_hsi = QLabel("Blanco de Referencia (.bil)")
-        input_white_hsi = QLineEdit()
-        button_white_hsi = QPushButton("Seleccionar")
-        button_white_hsi.clicked.connect(self.button_open_white_hsi(input_white_hsi))
-        button_white_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        asterisk_label_white_hsi = QLabel("*")
-        asterisk_label_white_hsi.setStyleSheet("color: red;")
-        asterisk_label_white_hsi.setFont(QFont("Arial", 12, QFont.Bold))
+        #label_hsi = QLabel("Imagen Hiperspectral (.bil)")
+        #input_hsi = QLineEdit()
+        #button_hsi = QPushButton("Seleccionar")
+        #button_hsi.clicked.connect(self.button_open_hsi(input_hsi))
+        #button_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #asterisk_label_hsi = QLabel("*")
+        #asterisk_label_hsi.setStyleSheet("color: red;")
+        #asterisk_label_hsi.setFont(QFont("Arial", 12, QFont.Bold))
 
 
-        label_black_hsi = QLabel("Negro de Referencia (.bil)")
-        input_black_hsi = QLineEdit()
-        button_black_hsi = QPushButton("Seleccionar")
-        button_black_hsi.clicked.connect(self.button_open_black_hsi(input_black_hsi))
-        button_black_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        asterisk_label_black_hsi = QLabel("*")
-        asterisk_label_black_hsi.setStyleSheet("color: red;")
-        asterisk_label_black_hsi.setFont(QFont("Arial", 12, QFont.Bold))
+        #label_white_hsi = QLabel("Blanco de Referencia (.bil)")
+        #input_white_hsi = QLineEdit()
+        #button_white_hsi = QPushButton("Seleccionar")
+        #button_white_hsi.clicked.connect(self.button_open_white_hsi(input_white_hsi))
+        #button_white_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #asterisk_label_white_hsi = QLabel("*")
+        #asterisk_label_white_hsi.setStyleSheet("color: red;")
+        #asterisk_label_white_hsi.setFont(QFont("Arial", 12, QFont.Bold))
+
+
+        #label_black_hsi = QLabel("Negro de Referencia (.bil)")
+        #input_black_hsi = QLineEdit()
+        #button_black_hsi = QPushButton("Seleccionar")
+        #button_black_hsi.clicked.connect(self.button_open_black_hsi(input_black_hsi))
+        #button_black_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #asterisk_label_black_hsi = QLabel("*")
+        #asterisk_label_black_hsi.setStyleSheet("color: red;")
+        #asterisk_label_black_hsi.setFont(QFont("Arial", 12, QFont.Bold))
         
-        label_columna = QLabel("Numero de Filas")
-        input_columna = QLineEdit()
-        input_columna.setFixedWidth(30)
-        asterisk_label_columna = QLabel("*")
-        asterisk_label_columna.setFixedWidth(20)
-        asterisk_label_columna.setStyleSheet("color: red;")
-        asterisk_label_columna.setFont(QFont("Arial", 12, QFont.Bold))
+        #label_columna = QLabel("Numero de Filas")
+        #input_columna = QLineEdit()
+        #input_columna.setFixedWidth(30)
+        #asterisk_label_columna = QLabel("*")
+        #asterisk_label_columna.setFixedWidth(20)
+        #asterisk_label_columna.setStyleSheet("color: red;")
+        #asterisk_label_columna.setFont(QFont("Arial", 12, QFont.Bold))
 
-        label_row = QLabel("Numero de Columnas")
+        #label_row = QLabel("Numero de Columnas")
 
 
-        self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
+        #self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
 
-        input_rgb_image_layout.addWidget(label_rgb_image)
-        input_rgb_image_layout.addWidget(asterisk_label_rbg)
-        input_rgb_image_layout.addWidget(input_rgb_image)
-        input_rgb_image_layout.addWidget(button_rgb_image)
+        #input_rgb_image_layout.addWidget(label_rgb_image)
+        #input_rgb_image_layout.addWidget(asterisk_label_rbg)
+        #input_rgb_image_layout.addWidget(input_rgb_image)
+        #input_rgb_image_layout.addWidget(button_rgb_image)
 
-        input_hsi_layout.addWidget(label_hsi)
-        input_hsi_layout.addWidget(asterisk_label_hsi)
-        input_hsi_layout.addWidget(input_hsi)
-        input_hsi_layout.addWidget(button_hsi)
+        #input_hsi_layout.addWidget(label_hsi)
+        #input_hsi_layout.addWidget(asterisk_label_hsi)
+        #input_hsi_layout.addWidget(input_hsi)
+        #input_hsi_layout.addWidget(button_hsi)
         
-        input_white_hsi_layout.addWidget(label_white_hsi)
-        input_white_hsi_layout.addWidget(asterisk_label_white_hsi)
-        input_white_hsi_layout.addWidget(input_white_hsi)
-        input_white_hsi_layout.addWidget(button_white_hsi)
+        #input_white_hsi_layout.addWidget(label_white_hsi)
+        #input_white_hsi_layout.addWidget(asterisk_label_white_hsi)
+        #input_white_hsi_layout.addWidget(input_white_hsi)
+        #input_white_hsi_layout.addWidget(button_white_hsi)
 
 
-        input_black_hsi_layout.addWidget(label_black_hsi)
-        input_black_hsi_layout.addWidget(asterisk_label_black_hsi)
-        input_black_hsi_layout.addWidget(input_black_hsi)
-        input_black_hsi_layout.addWidget(button_black_hsi)
+        #input_black_hsi_layout.addWidget(label_black_hsi)
+        #input_black_hsi_layout.addWidget(asterisk_label_black_hsi)
+        #input_black_hsi_layout.addWidget(input_black_hsi)
+        #input_black_hsi_layout.addWidget(button_black_hsi)
 
 
-        columna_layout.addWidget(label_columna)
-        columna_layout.addWidget(asterisk_label_columna)
-        columna_layout.addWidget(input_columna)
-        columna_layout.addChildWidget(label_row)
-        self.line_edits = [input_rgb_image, input_hsi, input_white_hsi, input_black_hsi]
+        #columna_layout.addWidget(label_columna)
+        #columna_layout.addWidget(asterisk_label_columna)
+        #columna_layout.addWidget(input_columna)
+        #columna_layout.addChildWidget(label_row)
+        #self.line_edits = [input_rgb_image, input_hsi, input_white_hsi, input_black_hsi]
     
-        import_form_layout.addLayout(input_rgb_image_layout)
-        import_form_layout.addLayout(input_cabecera_layout)
-        import_form_layout.addLayout(input_hsi_layout)
-        import_form_layout.addLayout(input_white_hsi_layout)
-        import_form_layout.addLayout(input_black_hsi_layout)
+        #import_form_layout.addLayout(input_rgb_image_layout)
+        #import_form_layout.addLayout(input_cabecera_layout)
+        #import_form_layout.addLayout(input_hsi_layout)
+        #import_form_layout.addLayout(input_white_hsi_layout)
+        #import_form_layout.addLayout(input_black_hsi_layout)
         #import_form_layout.addLayout(columna_layout)
 
         #import_form_layout.addLayout(input_black_hsi_layout)
         #import_form_layout.addWidget(input_grid_config_layout)
         #import_form_layout.addLayout(input_grid_row_column_layout)
-        import_form_layout.addWidget(self.label_image_selected)
+        #import_form_layout.addWidget(self.label_image_selected)
 
 
         # Botton importar imagen
-        self.clean_button = QPushButton("Limpiar")
-        self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        buttons_form_layout.addWidget(self.clean_button)
-        self.clean_button.clicked.connect(self.clean_form)
+        #self.clean_button = QPushButton("Limpiar")
+        #self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #buttons_form_layout.addWidget(self.clean_button)
+        #self.clean_button.clicked.connect(self.clean_form)
         
         #Boton de Limpiar formulario
-        self.import_button = QPushButton("Procesar")
-        self.import_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        buttons_form_layout.addWidget(self.import_button)
-        self.import_button.clicked.connect(self.import_image)
+        #self.import_button = QPushButton("Procesar")
+        #self.import_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #buttons_form_layout.addWidget(self.import_button)
+        #self.import_button.clicked.connect(self.import_image)
 
-        import_form_layout.addLayout(buttons_form_layout)
+        #import_form_layout.addLayout(buttons_form_layout)
         
-        self.progress_bar = CustomProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
+        #self.progress_bar = CustomProgressBar(self)
+        #self.progress_bar.setRange(0, 100)
+        #self.progress_bar.setValue(0)
         
-        import_form_layout.addWidget(self.progress_bar)
+        #import_form_layout.addWidget(self.progress_bar)
 
-        main_layout.addWidget(import_form_widget)
+        main_layout.addWidget(self.image_information_seccion_widget)
 
-        processing_form_widget =  ProcessingForm()
-        main_layout.addWidget(processing_form_widget)
+        #processing_form_widget =  ProcessingForm()
+        #main_layout.addWidget(processing_form_widget)
         
         #main_layout.addWidget(self.progress_bar)
         main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
@@ -914,7 +990,77 @@ class MainWindow(QMainWindow):
 
         self.threadpool = QThreadPool()
         print("Multithreading with maximum %d threads" % self.threadpool.maxThreadCount())
+    
+    def on_dowload_manual(self):
+        return ""
+    def on_extract_spectral_feactures(self):
+        self.dialog =  QDialog(self)
+        self.dialog.setWindowTitle(" ")
+        #self.dialog.setWindowFlags(Qt.FramelessWindowHint) 
+        #self.dialog.setFixedSize(500, 600)  # Fijar tamaño del diálogo
+        self.dialog.setStyleSheet("""
+            QDialog {
+                background-color: #ffffff;  /* Color de fondo del diálogo */
+                /*border: 2px solid #0078d7;*/  /* Borde del diálogo */
+                border-radius: 10px;        /* Bordes redondeados */
+            }
+            QLabel {
+                color: #000000;            /* Color del texto de las etiquetas */
+                font: bold 14px;           /* Fuente del texto de las etiquetas */
+            }
+            QPushButton {
+                background-color: #005A46; /* Color de fondo de los botones */
+                color: white;              /* Color del texto de los botones */
+                border: none;
+                padding: 8px 16px;         /* Relleno de los botones */
+                font: bold 12px;           /* Fuente del texto de los botones */
+                border-radius: 8px;        /* Bordes redondeados de los botones */
+            }
+            QPushButton:hover {
+                background-color: #004632; /* Color de fondo de los botones al pasar el ratón */
+            }
+            QLineEdit {
+                border: 1px solid; /* Borde de los campos de entrada */
+                padding: 4px;              /* Relleno de los campos de entrada */
+                border-radius: 4px;        /* Bordes redondeados de los campos de entrada */
+            }
+                                  
+           QLineEdit:focus {
+                border: 2px solid #005A46; /* Borde de los campos de entrada */
+            }
+        """)
+        
+        ## Dialog layout
+        dialog_layout = QVBoxLayout()
+        
+        dialog_layout.setAlignment(Qt.AlignTop)
 
+        self.process_form_dialog = ProcessingForm(color_boton = None)
+        dialog_layout.addWidget(self.process_form_dialog)
+
+        button_dialog_layout = QHBoxLayout()
+
+        cancel_button = QPushButton("Cancelar")
+        apply_button = QPushButton("Aplicar")
+
+        cancel_button.clicked.connect(self.dialog.reject)
+        apply_button.clicked.connect(self.process_extract_features)
+        
+        button_dialog_layout.addWidget(cancel_button)
+        button_dialog_layout.addWidget(apply_button)
+
+        #dialog_layout.addWidget(self.process_form_dialog)
+        dialog_layout.addLayout(button_dialog_layout)
+
+        self.dialog.setLayout(dialog_layout)
+        self.dialog.exec_()
+
+        return ""
+
+    def process_extract_features(self):
+        return ""
+    def on_save_data_spectral(self):
+        return ""
     def download_csv_spectrum(self):
         #options = QFileDialog.Options()
         #ptions |= QFileDialog.DontUseNativeDialog
