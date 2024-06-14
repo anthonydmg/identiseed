@@ -637,7 +637,7 @@ class ImageGridWidget(QWidget):
     def get_images_clicked_status(self):
         return self.image_labels
 
-class PanelFileInformation(QWidget):
+class PanelFileInformation(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.initUI()
@@ -645,12 +645,55 @@ class PanelFileInformation(QWidget):
     def initUI(self):
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
+        
+        self.setObjectName("custom-widget")  # Establecemos un nombre de objeto para el widget
+
+        style = """
+            QLabel {
+                    color: #000000;            /* Color del texto de las etiquetas */
+                    font: normal 14px;           /* Fuente del texto de las etiquetas */
+                }
+                QPushButton {
+                    background-color: #005A46; /* Color de fondo de los botones */
+                    color: white;              /* Color del texto de los botones */
+                    border: none;
+                    padding: 8px 16px;         /* Relleno de los botones */
+                    font: bold 12px;           /* Fuente del texto de los botones */
+                    border-radius: 8px;        /* Bordes redondeados de los botones */
+                }
+                QPushButton:hover {
+                    background-color: #004632; /* Color de fondo de los botones al pasar el ratón */
+                }
+                QLineEdit {
+                    border: 1px solid; /* Borde de los campos de entrada */
+                    padding: 4px;              /* Relleno de los campos de entrada */
+                    border-radius: 4px;        /* Bordes redondeados de los campos de entrada */
+                }
+                                    
+            QLineEdit:focus {
+                    border: 2px solid #005A46; /* Borde de los campos de entrada */
+                }
+            
+            #custom-widget {
+                border: 1px solid #e6e6e6;
+                padding: 0px;
+                margin: 0px
+            }
+        """
+        self.setStyleSheet(style)
+        # "font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;"
         title_panel = QLabel("Panel de Informacion")
         title_panel.setFont(FontType.MAIN_TITLE())
+        title_panel.setStyleSheet("""
+                background-color: #f0f0f0;
+                padding: 5px;                  
+               """)
         main_layout.addWidget(title_panel)
         
         info_file_image_label = QLabel("Informacion del Archivo de Image")
-        info_file_image_label.setFont(FontType.SUBSECTION_TITLE())
+        info_file_image_label.setFont(FontType.SECTION_TITLE())
+        info_file_image_label.setStyleSheet(Styles.SECTION_TITLE)
+
         resolution_field_label = QLabel("Resolucion:")
         type_file_field_label = QLabel("Tipo de archivo:")
 
@@ -662,6 +705,7 @@ class PanelFileInformation(QWidget):
         info_file_hsi_label = QLabel("Informacion del Archivo de Image")
         info_file_hsi_label.setFont(FontType.SUBSECTION_TITLE())
         spectral_range_label = QLabel("Rango Espectral:")
+        
         num_bands_label = QLabel("Numero de Bandas:")
         type_file_hsi_field_label = QLabel("Tipo de archivo:")
 
@@ -672,6 +716,9 @@ class PanelFileInformation(QWidget):
 
         self.setLayout(main_layout)
         #pass
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
 
 class MainWindow(QMainWindow):
 
@@ -898,7 +945,7 @@ class MainWindow(QMainWindow):
         #main_layout.addWidget(processing_form_widget)
         
         #main_layout.addWidget(self.progress_bar)
-        main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        #main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
         
         # Vista de las semillas identificadas
         self.process_view_widget = QWidget()
