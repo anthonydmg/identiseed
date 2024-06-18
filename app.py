@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import time
 from enum import Enum
+import os
 
 class CustomProgressBar(QProgressBar):
     def __init__(self, *args, **kwargs):
@@ -212,6 +213,7 @@ class FontType(Enum):
     MAIN_TITLE = QFont("Roboto", 24, QFont.Bold)
     SECTION_TITLE = QFont("Roboto", 16, QFont.Medium)
     SUBSECTION_TITLE = QFont("Roboto", 14, QFont.Normal)
+    NORMAL = QFont("Roboto", 14, QFont.Normal)
 
     def __call__(self):
         return self.value
@@ -263,7 +265,8 @@ class ProcessingForm(QWidget):
                             label_text="Imagen RGB (.tiff)",
                             fn_load_file = self.load_rgb_image,
                             color_boton = color_boton,
-                            color_texto= color_texto)
+                            color_texto= color_texto,
+                            filter_files = "Tiff files (*.tif)")
         
         self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
         self.label_image_selected.setVisible(False)
@@ -274,7 +277,8 @@ class ProcessingForm(QWidget):
                             required = True, 
                             label_text="Imagen Hiperspectral (.bil)",
                             color_boton = color_boton,
-                            color_texto= color_texto)
+                            color_texto= color_texto,
+                            filter_files= "BIL files (*.bil)")
         # Linea separadora
 
         self.add_separator_line(main_layout = procesing_form_layout)
@@ -284,13 +288,16 @@ class ProcessingForm(QWidget):
         calibration_sub_header.setStyleSheet(Styles.SECTION_TITLE)
         calibration_sub_header.setFont(FontType.SECTION_TITLE())
         procesing_form_layout.addWidget(calibration_sub_header)
-
+#QFileDialog.getOpenFileName(self, "Abrir Archivo", ".","BIL files (*.bil)","BIL Header files (*.bil.hdr)")
+# "Tiff files (*.tif)",
+# Tiff files (*.tif)
         self.label_white_hsi, self.input_white_hsi, _ = self.add_file_input(
                             main_layout = procesing_form_layout, 
                             required = True,
                             label_text="Blanco de Referencia (.bil)",
                             color_boton = color_boton,
-                            color_texto= color_texto)
+                            color_texto= color_texto,
+                            filter_files = "BIL files (*.bil)")
         
 
         self.label_black_hsi, self.input_black_hsi, _ = self.add_file_input(
@@ -298,7 +305,8 @@ class ProcessingForm(QWidget):
                             required = True, 
                             label_text="Negro de Referencia (.bil)",
                             color_boton = color_boton,
-                            color_texto= color_texto)
+                            color_texto= color_texto,
+                            filter_files = "BIL files (*.bil)")
 
         self.add_separator_line(main_layout = procesing_form_layout)
         # Seccion de Opciones de de Procesamiento
@@ -508,14 +516,15 @@ class ProcessingForm(QWidget):
                         required = False,
                         color_texto = QColor(0, 0, 0),
                         color_boton = None,
-                        fn_load_file = None):
+                        fn_load_file = None,
+                        filter_files = ""):
         
         input_layout = QHBoxLayout()
         label = QLabel(label_text)
         label.setStyleSheet("color: {};".format(color_texto.name()))
         input = QLineEdit()
         selection_button = QPushButton("Seleccionar")
-        selection_button.clicked.connect(self.button_open_file(input, fn_load_file))
+        selection_button.clicked.connect(self.button_open_file(input, filter_files, fn_load_file))
         
         if color_boton is not None:
             selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
@@ -538,9 +547,10 @@ class ProcessingForm(QWidget):
         return label, input, selection_button
     
 
-    def button_open_file(self, input, fn_load_file = None):
+    
+    def button_open_file(self, input, filter_files = "", fn_load_file = None):
         def _button_open_file():
-            path, _ = QFileDialog.getOpenFileName(self, "Abrir Archivo", ".","Tiff files (*.tif)","Tiff files (*.tif)")
+            path, _ = QFileDialog.getOpenFileName(self, "Abrir Archivo", ".", filter_files,filter_files)
             
             if not path:
                 print("Archivo no seleccionado")
@@ -555,6 +565,7 @@ class ProcessingForm(QWidget):
         return _button_open_file
 
     def load_rgb_image(self, path):
+       
         pixmap = QPixmap(path)
         self.label_image_selected.setPixmap(pixmap.scaled(200,200, Qt.KeepAspectRatio))
         self.label_image_selected.setVisible(True)
@@ -636,6 +647,78 @@ class ImageGridWidget(QWidget):
     
     def get_images_clicked_status(self):
         return self.image_labels
+    
+class PanelFullImage(QFrame):
+    def __init__(self) -> None:
+        super().__init__()
+        self.initUI()
+    
+    def initUI(self):
+        main_layout = QVBoxLayout()
+        main_layout.setAlignment(Qt.AlignTop)
+        
+        
+        self.setObjectName("panel-full-image")  # Establecemos un nombre de objeto para el widget
+
+        style = """
+            #panel-full-image {
+                border: 2px solid #e6e6e6;
+                padding: 0px;
+                margin: 0px
+            }
+        """
+        
+        self.setMinimumHeight(250)
+
+        self.setStyleSheet(style)
+      
+        self.image_label = QLabel("")
+        #self.image_label.setStyleSheet("""background: #e6e6e6""")
+        #self.image_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        #self.image_label.setAlignment(Qt.AlignCenter)
+        
+        self.image_filename_label = QLabel()
+
+        #self.image_label.setMinimumSize(400,400)
+        self.image_label.setScaledContents(True)
+        main_layout.addWidget(self.image_label, alignment= Qt.AlignHCenter)
+        main_layout.addWidget(self.image_filename_label, alignment= Qt.AlignHCenter)
+        self.pixmap = None
+        self.setLayout(main_layout)
+   
+    def paintEvent(self, event):
+        super().paintEvent(event)
+ 
+    
+    def resizeEvent(self, event):
+        # Redimensiona el pixmap para que se ajuste al tamaño de la ventana
+        if self.pixmap:
+            scaled_pixmap = self.pixmap.scaled(self.image_label.size(), Qt.KeepAspectRatio)
+            self.image_label.setPixmap(scaled_pixmap)
+            self.adjustSize()
+            super().resizeEvent(event)
+
+    def set_image(self, image_path):
+        file_name = os.path.basename(image_path)
+        self.image_filename_label.setText(file_name)
+        self.pixmap = QPixmap(image_path)
+
+
+        label_width = self.width()
+        print("label_width:", label_width)
+        pixmap_ratio = self.pixmap.width() / self.pixmap.height()
+        label_height = int(label_width / pixmap_ratio)
+        print("label_height:", label_height)
+        #self.image_label.setFixedSize(label_width, label_height)
+        self.image_label.setPixmap(self.pixmap.scaled(label_width, label_height, Qt.KeepAspectRatio))
+
+        
+        self.image_label.setVisible(True)
+        self.adjustSize()
+
+    def clean_image(self):
+        self.image_filename_label.setText("")
+
 
 class PanelFileInformation(QFrame):
     def __init__(self) -> None:
@@ -646,13 +729,14 @@ class PanelFileInformation(QFrame):
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
         
-        self.setObjectName("custom-widget")  # Establecemos un nombre de objeto para el widget
-
+        self.setObjectName("panel-info-widget")  # Establecemos un nombre de objeto para el widget
+        #       /*QLabel {
+                   # color: #000000;            /* Color del texto de las etiquetas */
+                    #font: normal 14px;           /* Fuente del texto de las etiquetas */
+                #}*/
+        
         style = """
-            QLabel {
-                    color: #000000;            /* Color del texto de las etiquetas */
-                    font: normal 14px;           /* Fuente del texto de las etiquetas */
-                }
+      
                 QPushButton {
                     background-color: #005A46; /* Color de fondo de los botones */
                     color: white;              /* Color del texto de los botones */
@@ -674,7 +758,7 @@ class PanelFileInformation(QFrame):
                     border: 2px solid #005A46; /* Borde de los campos de entrada */
                 }
             
-            #custom-widget {
+            #panel-info-widget {
                 border: 1px solid #e6e6e6;
                 padding: 0px;
                 margin: 0px
@@ -682,37 +766,91 @@ class PanelFileInformation(QFrame):
         """
         self.setStyleSheet(style)
         # "font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;"
-        title_panel = QLabel("Panel de Informacion")
-        title_panel.setFont(FontType.MAIN_TITLE())
-        title_panel.setStyleSheet("""
-                background-color: #f0f0f0;
-                padding: 5px;                  
-               """)
-        main_layout.addWidget(title_panel)
-        
+        #title_panel = QLabel("Panel de Informacion")
+        #title_panel.setFont(QFont("Roboto", 14, QFont.Bold))
+        #title_panel.setFont(FontType.MAIN_TITLE())
+        #  font: bold 16px;
+        #title_panel.setStyleSheet("""
+        #        color: #000000;
+        #        background-color: #f0f0f0;
+        #        padding: 5px;
+        #        margin: 0px                  
+        #       """)
+        #main_layout.addWidget(title_panel)
+        ## Imagen RGB FILE
         info_file_image_label = QLabel("Informacion del Archivo de Image")
-        info_file_image_label.setFont(FontType.SECTION_TITLE())
-        info_file_image_label.setStyleSheet(Styles.SECTION_TITLE)
-
-        resolution_field_label = QLabel("Resolucion:")
-        type_file_field_label = QLabel("Tipo de archivo:")
-
-       
-        main_layout.addWidget(info_file_image_label)
-        main_layout.addWidget(resolution_field_label)
-        main_layout.addWidget(type_file_field_label)
-
-        info_file_hsi_label = QLabel("Informacion del Archivo de Image")
-        info_file_hsi_label.setFont(FontType.SUBSECTION_TITLE())
-        spectral_range_label = QLabel("Rango Espectral:")
+        info_file_image_label.setFont(QFont("Roboto", 11, QFont.Bold))
+ 
+        info_file_image_label.setStyleSheet("""color: #333333;""")
         
+        resolution_field_label = QLabel("Resolucion:")
+
+        resolution_field_label.setFont(QFont("Roboto", 11, QFont.Normal))
+        
+        layout_resolution = QHBoxLayout()
+        layout_resolution.setAlignment(Qt.AlignLeft)
+
+        layout_resolution.addWidget(resolution_field_label)
+       
+        self.resolution_value_label = QLabel("640x420")
+        self.resolution_value_label.setFont(QFont("Roboto", 11, QFont.Normal))
+        layout_resolution.addWidget(self.resolution_value_label)
+        
+        type_file_field_label = QLabel("Tipo de archivo:")
+        type_file_field_label.setFont(QFont("Roboto", 11, QFont.Normal))
+
+        layout_type_file_rgb = QHBoxLayout()
+        layout_type_file_rgb.addWidget(type_file_field_label)
+
+        self.type_file_rgb_value = QLabel("TIF")
+        self.type_file_rgb_value.setFont(QFont("Roboto", 11, QFont.Normal))
+        layout_type_file_rgb.setAlignment(Qt.AlignLeft)
+        layout_type_file_rgb.addWidget(self.type_file_rgb_value)
+
+        main_layout.addWidget(info_file_image_label)
+        main_layout.addLayout(layout_resolution)
+        main_layout.addLayout(layout_type_file_rgb)
+
+        info_file_hsi_label = QLabel("Informacion del Archivo de Imagen Hiperespectral")
+        info_file_hsi_label.setFont(QFont("Roboto", 11, QFont.Bold))
+        info_file_hsi_label.setStyleSheet("""color: #333333;""")
+        
+        layout_spectral_range = QHBoxLayout()
+        layout_spectral_range.setAlignment(Qt.AlignLeft)
+        
+        spectral_range_label = QLabel("Rango Espectral:")
+        spectral_range_label.setFont(QFont("Roboto", 11, QFont.Normal))
+        self.spectral_range_value = QLabel("400nm - 900nm")
+        self.spectral_range_value.setFont(QFont("Roboto", 11, QFont.Normal))
+        layout_spectral_range.addWidget(spectral_range_label)
+        layout_spectral_range.addWidget( self.spectral_range_value)
+
+        layout_num_bands = QHBoxLayout()
+        layout_num_bands.setAlignment(Qt.AlignLeft)
+
         num_bands_label = QLabel("Numero de Bandas:")
+        num_bands_label.setFont(QFont("Roboto", 11, QFont.Normal))
+        
+        layout_num_bands.addWidget(num_bands_label)
+        self.num_bands_value = QLabel("240")
+        self.num_bands_value.setFont(QFont("Roboto", 11, QFont.Normal))
+        layout_num_bands.addWidget(self.num_bands_value)
+
+        layout_type_file_hsi = QHBoxLayout()
+        layout_type_file_hsi.setAlignment(Qt.AlignLeft)
+
         type_file_hsi_field_label = QLabel("Tipo de archivo:")
+        type_file_hsi_field_label.setFont(QFont("Roboto", 11, QFont.Normal))
+        type_file_hsi_value_label = QLabel("BIL")
+        type_file_hsi_value_label.setFont(QFont("Roboto", 11, QFont.Normal))
+
+        layout_type_file_hsi.addWidget(type_file_hsi_field_label)
+        layout_type_file_hsi.addWidget(type_file_hsi_value_label)
 
         main_layout.addWidget(info_file_hsi_label)
-        main_layout.addWidget(spectral_range_label)
-        main_layout.addWidget(num_bands_label)
-        main_layout.addWidget(type_file_hsi_field_label)
+        main_layout.addLayout(layout_spectral_range)
+        main_layout.addLayout(layout_num_bands)
+        main_layout.addLayout(layout_type_file_hsi)
 
         self.setLayout(main_layout)
         #pass
@@ -733,9 +871,12 @@ class MainWindow(QMainWindow):
         color_texto = QColor(0, 0, 0)
 
         # Main Layout Principal
-        main_layout = QHBoxLayout()
+        main_layout = QVBoxLayout()
         main_layout.setContentsMargins(20,20,20,20)
+        main_content_layout = QHBoxLayout()
 
+        #main_layout.setContentsMargins(20,20,20,20)
+        main_layout.setContentsMargins(20,20,20,20)
         ## Menu
         menu = self.menuBar()
         file_menu = menu.addMenu("Archivo")
@@ -755,23 +896,40 @@ class MainWindow(QMainWindow):
         button_action_help1.setStatusTip("Manual")
         button_action_help1.triggered.connect(self.on_dowload_manual)
         help_menu.addAction(button_action_help1)
-        
-        
-       
-        
-           # Vista de las semillas identificadas
+                
+         
         self.image_information_seccion_widget = QWidget()
       
         self.image_information_seccion_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
 
         image_information_layout = QVBoxLayout(self.image_information_seccion_widget)
 
+        panel_image_title = QLabel("Imagen RGB")
+        panel_image_title.setFont(QFont("Roboto", 14, QFont.Bold))
+        panel_image_title.setStyleSheet("""
+                color: #000000;
+                background-color: #f0f0f0;
+                padding: 5px;
+                margin: 0px                  
+               """)
+        self.panel_image_info_widget = PanelFullImage()
 
-        panel_file_info_widget = PanelFileInformation()
+        panel_file_info_title = QLabel("Panel de Informacion")
+        panel_file_info_title.setFont(QFont("Roboto", 14, QFont.Bold))
+        panel_file_info_title.setStyleSheet("""
+                color: #000000;
+                background-color: #f0f0f0;
+                padding: 5px;
+                margin: 0px                  
+               """)
+        
+        self.panel_file_info_widget = PanelFileInformation()
+        self.panel_file_info_widget .setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        image_information_layout.addWidget(panel_image_title)
 
-        panel_file_info_widget_2 = PanelFileInformation()
-        image_information_layout.addWidget(panel_file_info_widget)
-        image_information_layout.addWidget(panel_file_info_widget_2)
+        image_information_layout.addWidget(self.panel_image_info_widget)
+        image_information_layout.addWidget(panel_file_info_title)
+        image_information_layout.addWidget(self.panel_file_info_widget)
 
         # Crear acciones
 
@@ -939,7 +1097,7 @@ class MainWindow(QMainWindow):
         
         #import_form_layout.addWidget(self.progress_bar)
 
-        main_layout.addWidget(self.image_information_seccion_widget)
+        main_content_layout.addWidget(self.image_information_seccion_widget)
 
         #processing_form_widget =  ProcessingForm()
         #main_layout.addWidget(processing_form_widget)
@@ -954,7 +1112,7 @@ class MainWindow(QMainWindow):
         process_view_layout = QVBoxLayout(self.process_view_widget)
         
 
-        main_layout.addWidget(self.process_view_widget)
+        main_content_layout.addWidget(self.process_view_widget)
 
         tab_widget = QTabWidget()
         process_view_layout.addWidget(tab_widget)
@@ -1030,7 +1188,13 @@ class MainWindow(QMainWindow):
 
         tab_hci_data.addTab(self.spectrum_std_plot, "Espectro (Des. Estandar)")
 
-        
+        self.progress_bar = CustomProgressBar(self)
+
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        main_layout.addLayout(main_content_layout)
+        main_layout.addWidget(self.progress_bar)
+
         self.central_widget = QWidget()
         self.central_widget.setLayout(main_layout)
         self.setCentralWidget(self.central_widget)
@@ -1042,6 +1206,8 @@ class MainWindow(QMainWindow):
         return ""
     def on_extract_spectral_feactures(self):
         self.dialog =  QDialog(self)
+        
+        
         self.dialog.setWindowTitle(" ")
         #self.dialog.setWindowFlags(Qt.FramelessWindowHint) 
         #self.dialog.setFixedSize(500, 600)  # Fijar tamaño del diálogo
@@ -1105,6 +1271,21 @@ class MainWindow(QMainWindow):
         return ""
 
     def process_extract_features(self):
+        if self.process_form_dialog.validate_filled_form():
+            path_rgb_image = self.process_form_dialog.input_rgb_image.text()
+            self.panel_image_info_widget.set_image(path_rgb_image)
+            
+            path_hypespect_image = self.process_form_dialog.input_hsi.text()
+
+            #self.thread_process = QThread()
+            worker = Worker(path_rgb_image, path_hypespect_image)
+            worker.signals.progress_changed.connect(self.update_progress)
+            worker.signals.images_masks.connect(self.show_images_masks)
+            worker.signals.spectrum_data.connect(self.recive_spectrum_data)
+            
+            self.threadpool.start(worker)
+
+            self.dialog.accept()
         return ""
     def on_save_data_spectral(self):
         return ""
