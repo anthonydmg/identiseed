@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
 from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool
-from utils import black_white, extract_one_seed_hsi_features, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi
+from utils import black_white, extract_one_seed_hsi_features, read_bil_file, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi
 import cv2
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -26,17 +26,34 @@ class CustomProgressBar(QProgressBar):
         self.elapsed_time = 0
         self.remaining_time = 0
         self.setTextVisible(False)  # Ocultar el texto predeterminado
+        #                 border-radius: 5px;
+        # 
+        # background-color: #07bd04; 
+        # border: 2px solid grey;
         self.setStyleSheet("""
             QProgressBar {
                 border: 2px solid grey;
-                border-radius: 5px;
                 text-align: center;
+                margin-top: 0px;
+                padding-top:0px;
+                margin-left: 7px;
+                margin-right: 7px;           
             }
             QProgressBar::chunk {
-                background-color: #00FF00;  # Color verde
-                width: 20px;
+                background-color: #52cc50;
+                margin: 0px;
+                width: 10px;
+                border-bottom-right-radius: 10px;
+                border-bottom-left-radius: 10px;
             }
         """)
+
+    def reset_progres_bar(self):
+        self.custom_text = ""
+        self.start_time = time.time()
+        self.elapsed_time = 0
+        self.remaining_time = 0
+        self.setTextVisible(False) 
 
     def set_custom_text(self, text):
         self.custom_text = text
@@ -139,7 +156,7 @@ class MatplotlibWidget(QWidget):
 
 
 class WorkerSignals(QObject):
-    progress_changed = Signal(int)
+    progress_changed = Signal(int, str)
     images_masks = Signal(list, list)  # Señal para emitir datos al hilo principal
     spectrum_data = Signal(object)
     
@@ -147,31 +164,67 @@ class WorkerSignals(QObject):
 
 class Worker(QRunnable):
 
-    def __init__(self, path_rgb_image, path_hypespect_image) -> None:
+    def __init__(self, 
+                 path_rgb_image, 
+                 path_hypespect_image,
+                 path_white_reference,
+                 path_black_reference,
+                 grid_seeds_shape = [5,5],
+                 hue_range = None, 
+                 saturation_range = None, 
+                 value_range = None) -> None:
         super(Worker, self).__init__()
 
         self.signals = WorkerSignals()
         self.path_rgb_image = path_rgb_image
         self.path_hypespect_image = path_hypespect_image
+        self.hue_range = hue_range
+        self.saturation_range = saturation_range
+        self.value_range = value_range
+        self.grid_seeds_shape = grid_seeds_shape
+        self.path_white_reference = path_white_reference
+        self.path_black_reference = path_black_reference
 
     def run(self):
-        white_bands,black_bands = black_white("./sample_image/")
+        
+        self.signals.progress_changed.emit(0, "Procesanto Imagen RGB")
 
-        
         image_rgb = cv2.imread(self.path_rgb_image)
-        print("image_rgb.shape: ", image_rgb.shape)
-        mask, centro_x, centro_y, ancho, largo, angulo, counter = seed_detection(image_rgb,plot=False)
         
+        print("image_rgb.shape: ", image_rgb.shape)
+
+        mask, centro_x, centro_y, ancho, largo, angulo, counter = seed_detection(image_rgb,
+                                                                                 grid_seeds_shape = self.grid_seeds_shape,
+                                                                                 plot = False, 
+                                                                                 hue_range = self.hue_range,
+                                                                                 saturation_range= self.saturation_range,
+                                                                                 value_range = self.value_range
+                                                                                 )
+        
+        
+
         #self.mask_seeds = mask
         #self.centers_x = centro_x
-        seeds_rgb, seeds_masks, tras_matrix, rot_matrix, roi_seeds = seeds_extraction([5,5], mask, image_rgb, centro_x, centro_y, ancho, largo, angulo)
+        self.signals.progress_changed.emit(5, "Procesanto Imagen RGB")
         
+        seeds_rgb, seeds_masks, tras_matrix, rot_matrix, roi_seeds = seeds_extraction(self.grid_seeds_shape, mask, image_rgb, centro_x, centro_y, ancho, largo, angulo)
+        
+        self.signals.progress_changed.emit(10, "Leyendo datos espectrales")
         
         self.signals.images_masks.emit(seeds_rgb, seeds_masks)
 
-        white_bands,black_bands = black_white("./sample_image/")
+        #self.signals.progress_changed.emit(15, "")
+
+        white_bands = read_bil_file(self.path_white_reference)
+        self.signals.progress_changed.emit(15, "Leyendo datos espectrales")
+        black_bands = read_bil_file(self.path_black_reference)
+        self.signals.progress_changed.emit(20, "Leyendo datos espectrales")
+        #white_bands,black_bands = black_white("./sample_image/")
         
         frame_bands_correc = hyperspectral_images_seeds(self.path_hypespect_image, correction=True, white_bands=white_bands,black_bands=black_bands)
+        
+        self.signals.progress_changed.emit(25, "Leyendo datos espectrales")
+        
         print("frame_bands_correc.shape: ", frame_bands_correc.shape)
         seeds_spectrum = {}
         dsize = (image_rgb.shape[1], image_rgb.shape[0])
@@ -184,11 +237,11 @@ class Worker(QRunnable):
             
             extract_one_seed_hsi([5,5], mask, image_rgb, frame_bands_correc, centro_x, centro_y, ancho, largo, angulo, i + 1, plot= False)
             seeds_spectrum[str(i)] = {"x_long_waves": long_onda , "y_mean":  y_mean, "y_std": y_std} 
-            self.signals.progress_changed.emit(i * 100 / 25)
+            self.signals.progress_changed.emit( 25 + (i * 75) / 25, "Extrayendo Datos Espectrales")
 
         self.signals.spectrum_data.emit(seeds_spectrum)
 
-        self.signals.progress_changed.emit(100)
+        self.signals.progress_changed.emit(100, "Finalizado")
 
 class FileInput(QWidget):
     def __init__(self, 
@@ -223,6 +276,30 @@ class Styles:
     SECTION_TITLE = "color: #555555"
     SUBSECTION_TITLE = "color: #777777"
 
+class HomeWindow(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.initUI()
+    
+    def initUI(self):
+        main_layout = QVBoxLayout()
+        
+        description = QLabel("Extrae caracteristicas espectrales de semillas a apartir de una imagen hiperpectral")
+        description.setFont(QFont("Roboto", 20,  QFont.Medium))
+        description.setAlignment(Qt.AlignCenter)
+        imagen_description = QLabel()
+        pixmap =  QPixmap("./icons/Image_home_identiseed.png")
+        imagen_description.setPixmap(pixmap.scaled(1000,1000, Qt.KeepAspectRatio))
+        imagen_description.setAlignment(Qt.AlignCenter)
+        self.button_start = QPushButton("Comenzar")
+
+        main_layout.addWidget(description)
+        main_layout.addWidget(imagen_description)
+        main_layout.addWidget(self.button_start)
+
+        self.setLayout(main_layout)
+    
+
 class ProcessingForm(QWidget):
     def __init__(self,
                  parent = None,  
@@ -249,7 +326,6 @@ class ProcessingForm(QWidget):
 
         self.setMaximumSize(800, 16777215)
 
-        
         # Layout de cada campo del formulario
 
         # Seccion seleccion de imagen
@@ -327,9 +403,21 @@ class ProcessingForm(QWidget):
 
         procesing_form_layout.addLayout(method_layout)
 
+        threshold_layout = QHBoxLayout()
+
         threshold_label = QLabel("Umbral de color (HSV)")
 
-        procesing_form_layout.addWidget(threshold_label)
+        threshold_layout.addWidget(threshold_label)
+           # Crear un QCheckBox
+        self.checkbox_auto = QCheckBox("Automatico")
+        self.checkbox_auto.setChecked(True)
+
+        threshold_layout.addWidget(self.checkbox_auto)
+
+        # Conectar la señal toggled del QCheckBox a una función
+        self.checkbox_auto.toggled.connect(self.on_checkbox_auto_toggled)
+
+        procesing_form_layout.addLayout(threshold_layout)
         ## entrada de Hue 
         hue_layout = QHBoxLayout()
 
@@ -341,30 +429,30 @@ class ProcessingForm(QWidget):
 
         min_hue_label = QLabel("Min:")
         
-        min_hue_spin_box = QSpinBox()
-        min_hue_spin_box.setMinimum(0)
-        min_hue_spin_box.setMaximum(255)
-        min_hue_spin_box.setValue(10)
+        self.min_hue_spin_box = QSpinBox()
+        self.min_hue_spin_box.setMinimum(0)
+        self.min_hue_spin_box.setMaximum(255)
+        self.min_hue_spin_box.setValue(10)
 
         min_hue_layout.addWidget(min_hue_label)
-        min_hue_layout.addWidget(min_hue_spin_box)
+        min_hue_layout.addWidget(self.min_hue_spin_box)
         
-        max_hue_layout = QHBoxLayout()
-        max_hue_layout.setAlignment(Qt.AlignLeft)
+        self.max_hue_layout = QHBoxLayout()
+        self.max_hue_layout.setAlignment(Qt.AlignLeft)
         
         max_hue_label = QLabel("Max:")
 
-        max_hue_spin_box = QSpinBox()
-        max_hue_spin_box.setMinimum(0)
-        max_hue_spin_box.setMaximum(255)
-        max_hue_spin_box.setValue(10)
+        self.max_hue_spin_box = QSpinBox()
+        self.max_hue_spin_box.setMinimum(0)
+        self.max_hue_spin_box.setMaximum(255)
+        self.max_hue_spin_box.setValue(10)
 
-        max_hue_layout.addWidget(max_hue_label)
-        max_hue_layout.addWidget(max_hue_spin_box)
+        self.max_hue_layout.addWidget(max_hue_label)
+        self.max_hue_layout.addWidget(self.max_hue_spin_box)
 
         hue_layout.addWidget(hue_label)
         hue_layout.addLayout(min_hue_layout)
-        hue_layout.addLayout(max_hue_layout)
+        hue_layout.addLayout(self.max_hue_layout)
         
         procesing_form_layout.addLayout(hue_layout)
 
@@ -378,26 +466,26 @@ class ProcessingForm(QWidget):
         
         min_saturation_label = QLabel("Min:")
         
-        min_saturation_spin_box = QSpinBox()
-        min_saturation_spin_box.setMinimum(0)
-        min_saturation_spin_box.setMaximum(255)
-        min_saturation_spin_box.setValue(10)
+        self.min_saturation_spin_box = QSpinBox()
+        self.min_saturation_spin_box.setMinimum(0)
+        self.min_saturation_spin_box.setMaximum(255)
+        self.min_saturation_spin_box.setValue(10)
 
         min_saturation_layout.addWidget(min_saturation_label)
-        min_saturation_layout.addWidget(min_saturation_spin_box)
+        min_saturation_layout.addWidget(self.min_saturation_spin_box)
         
         max_saturation_layout = QHBoxLayout()
         max_saturation_layout.setAlignment(Qt.AlignLeft)
         
         max_saturation_label = QLabel("Max:")
 
-        max_saturation_spin_box = QSpinBox()
-        max_saturation_spin_box.setMinimum(0)
-        max_saturation_spin_box.setMaximum(255)
-        max_saturation_spin_box.setValue(10)
+        self.max_saturation_spin_box = QSpinBox()
+        self.max_saturation_spin_box.setMinimum(0)
+        self.max_saturation_spin_box.setMaximum(255)
+        self.max_saturation_spin_box.setValue(10)
 
         max_saturation_layout.addWidget(max_saturation_label)
-        max_saturation_layout.addWidget(max_saturation_spin_box)
+        max_saturation_layout.addWidget(self.max_saturation_spin_box)
 
         saturation_layout.addWidget(saturation_label)
         saturation_layout.addLayout(min_saturation_layout)
@@ -417,26 +505,26 @@ class ProcessingForm(QWidget):
 
         min_value_label = QLabel("Min:")
         
-        min_value_spin_box = QSpinBox()
-        min_value_spin_box.setMinimum(0)
-        min_value_spin_box.setMaximum(255)
-        min_value_spin_box.setValue(10)
+        self.min_value_spin_box = QSpinBox()
+        self.min_value_spin_box.setMinimum(0)
+        self.min_value_spin_box.setMaximum(255)
+        self.min_value_spin_box.setValue(10)
 
         min_value_layout.addWidget(min_value_label)
-        min_value_layout.addWidget(min_value_spin_box)
+        min_value_layout.addWidget(self.min_value_spin_box)
         
         max_value_layout = QHBoxLayout()
         max_value_layout.setAlignment(Qt.AlignLeft)
         
         max_value_label = QLabel("Max:")
 
-        max_value_spin_box = QSpinBox()
-        max_value_spin_box.setMinimum(0)
-        max_value_spin_box.setMaximum(255)
-        max_value_spin_box.setValue(10)
+        self.max_value_spin_box = QSpinBox()
+        self.max_value_spin_box.setMinimum(0)
+        self.max_value_spin_box.setMaximum(255)
+        self.max_value_spin_box.setValue(10)
 
         max_value_layout.addWidget(max_value_label)
-        max_value_layout.addWidget(max_value_spin_box)
+        max_value_layout.addWidget(self.max_value_spin_box)
 
         value_layout.addWidget(value_label)
         value_layout.addLayout(min_value_layout)
@@ -444,6 +532,9 @@ class ProcessingForm(QWidget):
         value_layout.addLayout(max_value_layout)
         
         procesing_form_layout.addLayout(value_layout)
+        
+        self.disable_widgets_hsv_options()
+        self.default_values_hsv_options()
 
         grid_label = QLabel("Grilla de Semillas")
         grid_label.setFont(FontType.SUBSECTION_TITLE())
@@ -456,26 +547,26 @@ class ProcessingForm(QWidget):
 
         num_columns_label = QLabel("Num. Columnas:")
 
-        num_columns_spin_box = QSpinBox()
-        num_columns_spin_box.setMinimum(0)
-        num_columns_spin_box.setMaximum(50)
-        num_columns_spin_box.setValue(5)
+        self.num_columns_spin_box = QSpinBox()
+        self.num_columns_spin_box.setMinimum(0)
+        self.num_columns_spin_box.setMaximum(50)
+        self.num_columns_spin_box.setValue(5)
 
         num_columns_layout.addWidget(num_columns_label)
-        num_columns_layout.addWidget(num_columns_spin_box)
+        num_columns_layout.addWidget(self.num_columns_spin_box)
 
         num_row_layout = QHBoxLayout()
         num_row_layout.setAlignment(Qt.AlignLeft)
 
         num_row_label = QLabel("Num. Filas:")
 
-        num_row_spin_box = QSpinBox()
-        num_row_spin_box.setMinimum(0)
-        num_row_spin_box.setMaximum(50)
-        num_row_spin_box.setValue(5)
+        self.num_row_spin_box = QSpinBox()
+        self.num_row_spin_box.setMinimum(0)
+        self.num_row_spin_box.setMaximum(50)
+        self.num_row_spin_box.setValue(5)
 
         num_row_layout.addWidget(num_row_label)
-        num_row_layout.addWidget(num_row_spin_box)
+        num_row_layout.addWidget(self.num_row_spin_box)
         
         procesing_form_layout.addLayout(num_columns_layout)
         procesing_form_layout.addLayout(num_row_layout)
@@ -503,13 +594,70 @@ class ProcessingForm(QWidget):
         p.setColor(self.backgroundRole(), color_fondo)
         self.setPalette(p)
     
+    def disable_widgets_hsv_options(self):
+        list_input = [
+            self.min_hue_spin_box,
+            self.max_hue_spin_box,
+            self.min_saturation_spin_box,
+            self.max_saturation_spin_box,
+            self.min_value_spin_box,
+            self.max_value_spin_box
+            ]
+        disabled_style = "background-color: #f0f0f0; color: #808080;"
+        
+        for w_input in list_input:
+            w_input.setEnabled(False)
+            # Establecer estilos para los widgets deshabilitados
+            w_input.setStyleSheet(disabled_style)
+
+    def default_values_hsv_options(self):
+     
+        self.min_hue_spin_box.setValue(0)
+        self.max_hue_spin_box.setValue(255)
+
+        self.min_saturation_spin_box.setValue(0)
+        self.max_saturation_spin_box.setValue(255)
+        
+        if self.input_rgb_image.text().strip() != "":
+            path_rgb_image = self.input_rgb_image.text()
+            image_rgb = cv2.imread(path_rgb_image)
+            frame_HSV = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2HSV)
+            min_v = int(frame_HSV[:, :, 2].mean())
+            self.min_value_spin_box.setValue(min_v)
+        else:
+            self.min_value_spin_box.setValue(0)
+    
+        self.max_value_spin_box.setValue(255)
+
+    def enable_widgets_hsv_options(self):
+        list_input = [
+            self.min_hue_spin_box,
+            self.max_hue_spin_box,
+            self.min_saturation_spin_box,
+            self.max_saturation_spin_box,
+            self.min_value_spin_box,
+            self.max_value_spin_box
+            ]
+        for w_input in list_input:
+            w_input.setEnabled(True)
+            # Establecer estilos para los widgets deshabilitados
+            w_input.setStyleSheet("")
+
+    def on_checkbox_auto_toggled(self, checked):
+        if checked:
+            self.disable_widgets_hsv_options()
+            self.default_values_hsv_options()
+        else:
+            self.enable_widgets_hsv_options()
+        return
+
     def add_separator_line(self, main_layout):
         line = QFrame()
 
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
         main_layout.addWidget(line)
-
+    
     def add_file_input(self,
                         main_layout,
                         label_text,
@@ -569,6 +717,7 @@ class ProcessingForm(QWidget):
         pixmap = QPixmap(path)
         self.label_image_selected.setPixmap(pixmap.scaled(200,200, Qt.KeepAspectRatio))
         self.label_image_selected.setVisible(True)
+        self.default_values_hsv_options()
     
 
     def validate_filled_form(self):
@@ -858,46 +1007,17 @@ class PanelFileInformation(QFrame):
     def paintEvent(self, event):
         super().paintEvent(event)
 
-class MainWindow(QMainWindow):
-
-    def __init__(self):
-        super(MainWindow, self).__init__()
+class FeatureExtractionWindow(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.spectrum_data = None
+        self.initUI()
+    
+    def initUI(self):
         
-        self.setWindowTitle("IDENTISEED")
-        self.setGeometry(100, 100, 500, 200)
-        # Colores
-        color_fondo = QColor(240, 240, 240)
-        color_boton = QColor(0, 70, 70)
-        color_texto = QColor(0, 0, 0)
-
-        # Main Layout Principal
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20,20,20,20)
         main_content_layout = QHBoxLayout()
 
-        #main_layout.setContentsMargins(20,20,20,20)
-        main_layout.setContentsMargins(20,20,20,20)
-        ## Menu
-        menu = self.menuBar()
-        file_menu = menu.addMenu("Archivo")
-        button_action_file1 = QAction("Guardar datos espectrales", self)
-        button_action_file1.setStatusTip("Guardar Datos Espectrales")
-        button_action_file1.triggered.connect(self.on_save_data_spectral)
-        file_menu.addAction(button_action_file1)
-
-        process_menu = menu.addMenu("Procesamiento")
-        button_action_process1 = QAction("Extraccion de Caracteristicas", self)
-        button_action_process1.setStatusTip("Extraccion de Caracteristicas")
-        button_action_process1.triggered.connect(self.on_extract_spectral_feactures)
-        process_menu.addAction(button_action_process1)
-
-        help_menu = menu.addMenu("Ayuda")
-        button_action_help1 = QAction("Manual", self)
-        button_action_help1.setStatusTip("Manual")
-        button_action_help1.triggered.connect(self.on_dowload_manual)
-        help_menu.addAction(button_action_help1)
-                
-         
         self.image_information_seccion_widget = QWidget()
       
         self.image_information_seccion_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
@@ -912,6 +1032,7 @@ class MainWindow(QMainWindow):
                 padding: 5px;
                 margin: 0px                  
                """)
+        
         self.panel_image_info_widget = PanelFullImage()
 
         panel_file_info_title = QLabel("Panel de Informacion")
@@ -930,172 +1051,6 @@ class MainWindow(QMainWindow):
         image_information_layout.addWidget(self.panel_image_info_widget)
         image_information_layout.addWidget(panel_file_info_title)
         image_information_layout.addWidget(self.panel_file_info_widget)
-
-        # Crear acciones
-
-        # Layout Principal del Fomulario de Importar Imagen
-        #import_form_widget = QWidget()
-        #import_form_layout = QVBoxLayout(import_form_widget)
-        #import_form_widget.setMaximumSize(800, 16777215)
-        # Layout de cada campo del formulario
-        #input_rgb_image_layout = QHBoxLayout()
-        #input_cabecera_layout = QHBoxLayout()
-        #input_hsi_layout  = QHBoxLayout()
-        #input_white_hsi_layout  = QHBoxLayout()
-        #input_black_hsi_layout  = QHBoxLayout()
-        #columna_layout  = QHBoxLayout()
-        #input_grid_config_layout  = QHBoxLayout()
-        #input_grid_row_column_layout  = QHBoxLayout()
-        
-        #row_colum_layout = QHBoxLayout()
-        #buttons_form_layout = QHBoxLayout()
-        
-        # Establecer fondo para el formulario
-        #import_form_widget.setAutoFillBackground(True)
-        #p = import_form_widget.palette()
-        #p.setColor(import_form_widget.backgroundRole(), color_fondo)
-        #import_form_widget.setPalette(p)
-        
-        #label_dist_grid_image = QLabel("Distribucion de grilla de semillas")
-        #label_dist_grid_image.setStyleSheet("color: {};".format(color_texto.name()))
-        
-        #input_grid_config_layout.addWidget(label_dist_grid_image)
-
-        #label_row_grid = QLabel("Numero de Filas:")
-        #label_row_grid.setStyleSheet("color: {};".format(color_texto.name()))
-        #input_row_grid = QLineEdit()
-        
-        #row_colum_widget = QWidget()
-        #row_colum_layout = QHBoxLayout(row_colum_widget)
-        #row_colum_widget.setMaximumHeight(100)
-
-        #label_colum_grid = QLabel("Numero de Columnas:")
-        #label_colum_grid.setStyleSheet("color: {};".format(color_texto.name()))
-        #input_colum_grid = QLineEdit()
-
-        #row_colum_layout.addWidget(label_row_grid)
-        #row_colum_layout.addWidget(input_row_grid)
-        #row_colum_layout.addWidget(label_colum_grid)
-        #row_colum_layout.addWidget(input_colum_grid)
-
-        
-      
-        #input_grid_row_column_layout.addWidget(row_colum_widget)
-        #input_grid_config_layout.addWidget(row_colum_widget)
-
-        #label_rgb_image = QLabel("Imagen RGB (.tiff)")
-        #label_rgb_image.setStyleSheet("color: {};".format(color_texto.name()))
-        #input_rgb_image = QLineEdit()
-        #button_rgb_image = QPushButton("Seleccionar")
-        #button_rgb_image.clicked.connect(self.button_open_rgb_imge(input_rgb_image))
-        #button_rgb_image.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-
-        #asterisk_label_rbg = QLabel("*")
-        #asterisk_label_rbg.setStyleSheet("color: red;")
-        #asterisk_label_rbg.setFont(QFont("Arial", 12, QFont.Bold))
-
-        #label_hsi = QLabel("Imagen Hiperspectral (.bil)")
-        #input_hsi = QLineEdit()
-        #button_hsi = QPushButton("Seleccionar")
-        #button_hsi.clicked.connect(self.button_open_hsi(input_hsi))
-        #button_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        #asterisk_label_hsi = QLabel("*")
-        #asterisk_label_hsi.setStyleSheet("color: red;")
-        #asterisk_label_hsi.setFont(QFont("Arial", 12, QFont.Bold))
-
-
-        #label_white_hsi = QLabel("Blanco de Referencia (.bil)")
-        #input_white_hsi = QLineEdit()
-        #button_white_hsi = QPushButton("Seleccionar")
-        #button_white_hsi.clicked.connect(self.button_open_white_hsi(input_white_hsi))
-        #button_white_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        #asterisk_label_white_hsi = QLabel("*")
-        #asterisk_label_white_hsi.setStyleSheet("color: red;")
-        #asterisk_label_white_hsi.setFont(QFont("Arial", 12, QFont.Bold))
-
-
-        #label_black_hsi = QLabel("Negro de Referencia (.bil)")
-        #input_black_hsi = QLineEdit()
-        #button_black_hsi = QPushButton("Seleccionar")
-        #button_black_hsi.clicked.connect(self.button_open_black_hsi(input_black_hsi))
-        #button_black_hsi.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        #asterisk_label_black_hsi = QLabel("*")
-        #asterisk_label_black_hsi.setStyleSheet("color: red;")
-        #asterisk_label_black_hsi.setFont(QFont("Arial", 12, QFont.Bold))
-        
-        #label_columna = QLabel("Numero de Filas")
-        #input_columna = QLineEdit()
-        #input_columna.setFixedWidth(30)
-        #asterisk_label_columna = QLabel("*")
-        #asterisk_label_columna.setFixedWidth(20)
-        #asterisk_label_columna.setStyleSheet("color: red;")
-        #asterisk_label_columna.setFont(QFont("Arial", 12, QFont.Bold))
-
-        #label_row = QLabel("Numero de Columnas")
-
-
-        #self.label_image_selected = QLabel(alignment = Qt.AlignCenter)
-
-        #input_rgb_image_layout.addWidget(label_rgb_image)
-        #input_rgb_image_layout.addWidget(asterisk_label_rbg)
-        #input_rgb_image_layout.addWidget(input_rgb_image)
-        #input_rgb_image_layout.addWidget(button_rgb_image)
-
-        #input_hsi_layout.addWidget(label_hsi)
-        #input_hsi_layout.addWidget(asterisk_label_hsi)
-        #input_hsi_layout.addWidget(input_hsi)
-        #input_hsi_layout.addWidget(button_hsi)
-        
-        #input_white_hsi_layout.addWidget(label_white_hsi)
-        #input_white_hsi_layout.addWidget(asterisk_label_white_hsi)
-        #input_white_hsi_layout.addWidget(input_white_hsi)
-        #input_white_hsi_layout.addWidget(button_white_hsi)
-
-
-        #input_black_hsi_layout.addWidget(label_black_hsi)
-        #input_black_hsi_layout.addWidget(asterisk_label_black_hsi)
-        #input_black_hsi_layout.addWidget(input_black_hsi)
-        #input_black_hsi_layout.addWidget(button_black_hsi)
-
-
-        #columna_layout.addWidget(label_columna)
-        #columna_layout.addWidget(asterisk_label_columna)
-        #columna_layout.addWidget(input_columna)
-        #columna_layout.addChildWidget(label_row)
-        #self.line_edits = [input_rgb_image, input_hsi, input_white_hsi, input_black_hsi]
-    
-        #import_form_layout.addLayout(input_rgb_image_layout)
-        #import_form_layout.addLayout(input_cabecera_layout)
-        #import_form_layout.addLayout(input_hsi_layout)
-        #import_form_layout.addLayout(input_white_hsi_layout)
-        #import_form_layout.addLayout(input_black_hsi_layout)
-        #import_form_layout.addLayout(columna_layout)
-
-        #import_form_layout.addLayout(input_black_hsi_layout)
-        #import_form_layout.addWidget(input_grid_config_layout)
-        #import_form_layout.addLayout(input_grid_row_column_layout)
-        #import_form_layout.addWidget(self.label_image_selected)
-
-
-        # Botton importar imagen
-        #self.clean_button = QPushButton("Limpiar")
-        #self.clean_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        #buttons_form_layout.addWidget(self.clean_button)
-        #self.clean_button.clicked.connect(self.clean_form)
-        
-        #Boton de Limpiar formulario
-        #self.import_button = QPushButton("Procesar")
-        #self.import_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        #buttons_form_layout.addWidget(self.import_button)
-        #self.import_button.clicked.connect(self.import_image)
-
-        #import_form_layout.addLayout(buttons_form_layout)
-        
-        #self.progress_bar = CustomProgressBar(self)
-        #self.progress_bar.setRange(0, 100)
-        #self.progress_bar.setValue(0)
-        
-        #import_form_layout.addWidget(self.progress_bar)
 
         main_content_layout.addWidget(self.image_information_seccion_widget)
 
@@ -1124,7 +1079,7 @@ class MainWindow(QMainWindow):
         tab_widget.addTab(self.masks_tab, "Mascaras")
 
         ## Boton de ver grafico de bandas espectradles
-
+        color_boton = QColor(0, 70, 70)
         spectrum_button = QPushButton("Mostrar Informacion Espectral")
         spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
         spectrum_button.clicked.connect(self.button_show_spectrum)
@@ -1193,20 +1148,283 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         main_layout.addLayout(main_content_layout)
-        main_layout.addWidget(self.progress_bar)
+        main_layout.addWidget(self.progress_bar, alignment= Qt.AlignTop)
+        
+        self.setLayout(main_layout)
+
+    def setSpectrumData(self, data):
+        self.spectrum_data = data
+    
+
+    def button_show_spectrum(self):
+        #Crear y agregar el gráfico dentro de la sección del gráfico
+    
+        # Actualizar el gráfico de barras
+        #self.canvas_avg_graph.setVisible(True)
+        #self.ax_avg.clear()
+        images_clicked_status = self.seeds_tab.get_images_clicked_status()
+        images_clicked_ids = [ key for key, value in images_clicked_status.items() if value]
+        if len(images_clicked_ids) > 0:
+            #self.ax.hist(file_sizes, bins=20, alpha=0.7, color='blue')
+            x = self.spectrum_data[str(images_clicked_ids[0])]["x_long_waves"]
+            y_mean_data = []
+            y_std_data = []
+            seed_labels = []
+                    
+            for image_id in images_clicked_ids:
+                y_mean = self.spectrum_data[str(image_id)]["y_mean"]
+                y_std = self.spectrum_data[str(image_id)]["y_std"]
+                seed_label = f"semilla-{image_id}"
+
+                y_mean_data.append(y_mean)
+                y_std_data.append(y_std)
+                seed_labels.append(seed_label)
+            
+            self.spectrum_avg_plot.update_plot(x_data=x, y_data = y_mean_data, labels=seed_labels)
+            self.spectrum_std_plot.update_plot(x_data=x, y_data = y_std_data, labels=seed_labels)
+            #self.ax_avg.set_title('Spectrum (avg)')
+            #self.ax_avg.set_xlabel('Longitudes de Onda Luz')
+            #self.ax_avg.set_ylabel('Reflectance Mean')
+            
+        #else:
+            #self.ax_avg.text(0.5, 0.5, 'Ningua semilla seleccionada', horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+            #self.canvas_avg_graph.draw()
+        return
+    
+    def download_csv_spectrum(self):
+        #options = QFileDialog.Options()
+        #ptions |= QFileDialog.DontUseNativeDialog
+        fileName, _ = QFileDialog.getSaveFileName(self, "Seleccionar archivo o carpeta", "", "CSV Files (*.csv);;All Files (*)")
+        if fileName:
+            # Verificar si el nombre del archivo tiene la extensión .csv
+            if not fileName.endswith(".csv"):
+                # Agregar la extensión .csv si no está presente
+                fileName += ".csv"
+            print("Archivo seleccionado:", fileName)
+
+            ## Guardar archivo
+            x_long_waves = self.spectrum_data['0']['x_long_waves']
+
+            columns = ["seed_id"] +  [f"avg_band_{lw}" for lw in x_long_waves] + [ f"sd_band_{lw}" for lw in x_long_waves]
+            
+            print("\nself.spectrum_data:", self.spectrum_data)
+            data = [ [id_seed] + seed_data["y_mean"].tolist() + seed_data["y_std"].tolist() for id_seed , seed_data in self.spectrum_data.items()]
+            print()
+            print("\ndata[0]:", data[0]) 
+            df = pd.DataFrame(data, columns = columns)
+            print(df)
+            df.to_csv(fileName, index= False)
+
+    
+    def setImageSeeds(self, seeds_rgb, seeds_masks):
+        self.seeds_rgb = seeds_rgb
+        self.seeds_masks = seeds_masks
+        self.show_images_masks(seeds_rgb, seeds_masks)
+    
+    def show_images_masks(self, seeds_rgb, seeds_masks):
+        # Crear un Worker y conectar la señal del Worker a los métodos de actualización de la interfaz de usuario
+        
+        for i in range(len(seeds_rgb)):
+            seed_image = seeds_rgb[i]
+            # completar fondo negro
+            h_seed, w_seed, _ = seed_image.shape
+            # Calcular la dimension maxima para hacer el fondo cuadrado
+            max_dimension = max(h_seed, w_seed)
+            # Crear una imagen negra cuadrada
+            black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
+            # Calcular las coordenadas para colocar la imagen original
+            inicio_y = (max_dimension - h_seed) // 2
+            inicio_x = (max_dimension - w_seed) // 2
+            # superponer imagen a frame negro
+            black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed] = seed_image
+    
+            black_frame = cv2.cvtColor(black_frame, cv2.COLOR_BGR2RGB)
+            column = i % 5
+            row = i // 5
+            self.seeds_tab.add_image(black_frame, row, column, i)
+
+            seed_mask = seeds_masks[i]
+
+            mask_black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
+            mask_black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed, :] = seed_mask[..., np.newaxis]
+            self.masks_tab.add_image(mask_black_frame, row, column, i)
+    
+class MainWindow(QMainWindow):
+
+    def __init__(self):
+        super(MainWindow, self).__init__()
+        
+        self.setWindowTitle("IDENTISEED")
+        self.setGeometry(100, 100, 500, 200)
+        # Colores
+        color_fondo = QColor(240, 240, 240)
+        color_boton = QColor(0, 70, 70)
+        color_texto = QColor(0, 0, 0)
+
+        # Main Layout Principal
+        self.main_layout = QVBoxLayout()
+        self.main_layout.setContentsMargins(20,20,20,20)
+        self.main_layout.setSpacing(0)
+        
+        main_content_layout = QHBoxLayout()
+       
+        #main_layout.setContentsMargins(20,20,20,20)
+        ## Menu
+        menu = self.menuBar()
+        file_menu = menu.addMenu("Archivo")
+        button_action_file1 = QAction("Guardar datos espectrales", self)
+        button_action_file1.setStatusTip("Guardar Datos Espectrales")
+        button_action_file1.triggered.connect(self.on_save_data_spectral)
+        file_menu.addAction(button_action_file1)
+
+        process_menu = menu.addMenu("Procesamiento")
+        button_action_process1 = QAction("Extraccion de Caracteristicas", self)
+        button_action_process1.setStatusTip("Extraccion de Caracteristicas")
+        button_action_process1.triggered.connect(self.on_extract_spectral_feactures)
+        process_menu.addAction(button_action_process1)
+
+        help_menu = menu.addMenu("Ayuda")
+        button_action_help1 = QAction("Manual", self)
+        button_action_help1.setStatusTip("Manual")
+        button_action_help1.triggered.connect(self.on_dowload_manual)
+        help_menu.addAction(button_action_help1)
+                
+         
+        #self.image_information_seccion_widget = QWidget()
+      
+        #self.image_information_seccion_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
+
+        #image_information_layout = QVBoxLayout(self.image_information_seccion_widget)
+
+        #panel_image_title = QLabel("Imagen RGB")
+        #panel_image_title.setFont(QFont("Roboto", 14, QFont.Bold))
+        #panel_image_title.setStyleSheet("""
+        #        color: #000000;
+        #        background-color: #f0f0f0;
+        #        padding: 5px;
+        #        margin: 0px                  
+        #       """)
+        #self.panel_image_info_widget = PanelFullImage()
+
+        #panel_file_info_title = QLabel("Panel de Informacion")
+        #panel_file_info_title.setFont(QFont("Roboto", 14, QFont.Bold))
+        #panel_file_info_title.setStyleSheet("""
+        #        color: #000000;
+        #        background-color: #f0f0f0;
+        #        padding: 5px;
+        #        margin: 0px                  
+        #       """)
+        
+        #self.panel_file_info_widget = PanelFileInformation()
+        #self.panel_file_info_widget .setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        #image_information_layout.addWidget(panel_image_title)
+
+        #image_information_layout.addWidget(self.panel_image_info_widget)
+        #image_information_layout.addWidget(panel_file_info_title)
+        #image_information_layout.addWidget(self.panel_file_info_widget)
+
+       
+
+        #main_content_layout.addWidget(self.image_information_seccion_widget)
+
+        #processing_form_widget =  ProcessingForm()
+        #main_layout.addWidget(processing_form_widget)
+        
+        #main_layout.addWidget(self.progress_bar)
+        #main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        
+        # Vista de las semillas identificadas
+        #self.process_view_widget = QWidget()
+      
+        #self.process_view_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
+        #process_view_layout = QVBoxLayout(self.process_view_widget)
+        
+
+        #main_content_layout.addWidget(self.process_view_widget)
+
+        #tab_widget = QTabWidget()
+        #process_view_layout.addWidget(tab_widget)
+
+        #self.seeds_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada")
+        #self.masks_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada", image_clickable = False)
+
+        #tab_widget.addTab(self.seeds_tab, "Semillas")
+        #tab_widget.addTab(self.masks_tab, "Mascaras")
+
+        ## Boton de ver grafico de bandas espectradles
+
+        #spectrum_button = QPushButton("Mostrar Informacion Espectral")
+        #spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #spectrum_button.clicked.connect(self.button_show_spectrum)
+        
+        #process_view_layout.addWidget(spectrum_button)
+
+        ## Header se seccion de descarga de informacion hypespectral
+        #spectrum_header = QWidget()
+        #spectrum_header.setStyleSheet("font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;")
+        #spectrum_header_layout = QHBoxLayout(spectrum_header)
+       
+        #spectrum_label = QLabel("<b>Información Hiperespectral</b>")
+        #spectrum_label.setAlignment(Qt.AlignLeft)
+        #spectrum_label.setStyleSheet("font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;")
+
+        #self.download_spectrum = QPushButton()
+        
+        #icon_download = QIcon("./icons/icons8-descargar-48.png")  # Ruta al archivo de icono
+        #self.download_spectrum.setIcon(icon_download)
+
+        #self.download_spectrum.clicked.connect(self.download_csv_spectrum)
+
+
+        #spectrum_header_layout.addWidget(spectrum_label)
+        #spectrum_header_layout.addStretch(1)
+        #spectrum_header_layout.addWidget(self.download_spectrum)
+        
+        #process_view_layout.addWidget(spectrum_header)
+
+        #tab_hci_data = QTabWidget()
+        #process_view_layout.addWidget(tab_hci_data)
+        
+        ## Tab de grafico de avg 
+        #self.spectrum_avg_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
+
+
+        #tab_hci_data.addTab(self.spectrum_avg_plot, "Espectro (Promedio)")
+        ## Tab de grafico de desviacion estandar 
+        #self.spectrum_std_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
+
+        #tab_hci_data.addTab(self.spectrum_std_plot, "Espectro (Des. Estandar)")
+
+        #self.progress_bar = CustomProgressBar(self)
+
+        #self.progress_bar.setRange(0, 100)
+        #self.progress_bar.setValue(0)
+        self.home_window = HomeWindow()
+        self.home_window.button_start.clicked.connect(self.on_extract_spectral_feactures)
+
+        self.feature_extraction_window = FeatureExtractionWindow()
+        
+        self.main_layout.addWidget(self.home_window)
+        #main_layout.addLayout(main_content_layout)
+        #main_layout.addWidget(self.progress_bar, alignment= Qt.AlignTop)
 
         self.central_widget = QWidget()
-        self.central_widget.setLayout(main_layout)
+        self.central_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.central_widget)
 
         self.threadpool = QThreadPool()
         print("Multithreading with maximum %d threads" % self.threadpool.maxThreadCount())
     
+    def show_feature_extraction_window(self):
+        # Reemplazar el widget actual por widget1
+        self.main_layout.removeWidget(self.home_window)
+        self.home_window.setParent(None)
+        self.main_layout.addWidget( self.feature_extraction_window)
+
     def on_dowload_manual(self):
         return ""
     def on_extract_spectral_feactures(self):
         self.dialog =  QDialog(self)
-        
         
         self.dialog.setWindowTitle(" ")
         #self.dialog.setWindowFlags(Qt.FramelessWindowHint) 
@@ -1272,15 +1490,55 @@ class MainWindow(QMainWindow):
 
     def process_extract_features(self):
         if self.process_form_dialog.validate_filled_form():
+            
+            self.show_feature_extraction_window()
+            self.feature_extraction_window.progress_bar.reset_progres_bar()
+
             path_rgb_image = self.process_form_dialog.input_rgb_image.text()
-            self.panel_image_info_widget.set_image(path_rgb_image)
+            self.feature_extraction_window.panel_image_info_widget.set_image(path_rgb_image)
             
             path_hypespect_image = self.process_form_dialog.input_hsi.text()
+            
+            auto_filter_hsv = self.process_form_dialog.checkbox_auto.isChecked()
+            
+            num_row = self.process_form_dialog.num_row_spin_box.value()
+            num_colum = self.process_form_dialog.num_columns_spin_box.value()
 
-            #self.thread_process = QThread()
-            worker = Worker(path_rgb_image, path_hypespect_image)
+            grid_seeds_shape = (num_row, num_colum)
+
+            path_white_reference = self.process_form_dialog.input_white_hsi.text()
+            path_black_reference = self.process_form_dialog.input_black_hsi.text()
+
+            print("grid_seeds_shape:", grid_seeds_shape)
+
+            if auto_filter_hsv:
+                worker = Worker(path_rgb_image, 
+                                path_hypespect_image, 
+                                grid_seeds_shape = grid_seeds_shape, 
+                                path_white_reference = path_white_reference,
+                                path_black_reference = path_black_reference)
+            else:
+
+                hue_range = (self.process_form_dialog.min_hue_spin_box.value(), 
+                             self.process_form_dialog.max_hue_spin_box.value())
+                
+                saturation_range = (self.process_form_dialog.min_saturation_spin_box.value(), 
+                             self.process_form_dialog.max_saturation_spin_box.value())
+                
+                value_range = (self.process_form_dialog.min_value_spin_box.value(), 
+                             self.process_form_dialog.max_value_spin_box.value())
+                
+                worker = Worker(path_rgb_image, 
+                                path_hypespect_image, 
+                                hue_range, 
+                                saturation_range, 
+                                value_range, 
+                                grid_seeds_shape = grid_seeds_shape,
+                                path_white_reference = path_white_reference,
+                                path_black_reference = path_black_reference)
+            
             worker.signals.progress_changed.connect(self.update_progress)
-            worker.signals.images_masks.connect(self.show_images_masks)
+            worker.signals.images_masks.connect(self.feature_extraction_window.setImageSeeds)
             worker.signals.spectrum_data.connect(self.recive_spectrum_data)
             
             self.threadpool.start(worker)
@@ -1341,12 +1599,11 @@ class MainWindow(QMainWindow):
             mask_black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed, :] = seed_mask[..., np.newaxis]
             self.masks_tab.add_image(mask_black_frame, row, column, i)
 
-    def update_progress(self, value):
-        text = f"Progreso: {value}% completado"
-        self.progress_bar.setValue(value)
-        self.progress_bar.set_custom_text(text)
-        self.progress_bar.update_time(value)
-
+    def update_progress(self, value, status):
+        text = f"{status}: {value}% completado"
+        self.feature_extraction_window.progress_bar.setValue(value)
+        self.feature_extraction_window.progress_bar.set_custom_text(text)
+        self.feature_extraction_window.progress_bar.update_time(value)
 
     def button_show_spectrum(self):
         #Crear y agregar el gráfico dentro de la sección del gráfico
@@ -1489,6 +1746,8 @@ class MainWindow(QMainWindow):
 
     def recive_spectrum_data(self, spectrum_data):
         self.spectrum_data = spectrum_data
+        print("\nself.spectrum_data:", self.spectrum_data)
+        self.feature_extraction_window.setSpectrumData(self.spectrum_data)
 
 
     def process_finished(self, result):
