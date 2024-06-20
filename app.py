@@ -109,12 +109,27 @@ class MatplotlibPlotWidget(QWidget):
         layout = QHBoxLayout()
         self.setLayout(layout)
         self.setStyleSheet("background-color: #f0f0f0;")
-        self.setMinimumSize(400, 300)
-
+        #self.setMinimumSize(400, 300)
+        
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvas(self.fig)
         layout.addWidget(self.canvas)
         
+         # Obtén el tamaño de la pantalla y la densidad de píxeles
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+
+        # Establece la proporción deseada de la pantalla que la imagen debe ocupar (por ejemplo, 50%)
+        #proportion_of_screen = 0.3
+
+        # Calcula el tamaño deseado en píxeles basado en la proporción de la pantalla
+        self.desired_width_in_pixels = int(screen_width * 0.31)
+        self.desired_height_in_pixels = int(screen_height * 0.20)
+
+        self.canvas.setFixedSize(self.desired_width_in_pixels, self.desired_height_in_pixels)
+
         self.title = title
         
         self.xlabel = xlabel
@@ -127,7 +142,15 @@ class MatplotlibPlotWidget(QWidget):
         self.ax.set_ylabel(ylabel)
 
         self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(False)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.height_per_line_legend = screen_height * 0.08
+        
+        self.scroll_area.setFixedHeight(screen_height * 0.2)
+        self.scroll_area.setMinimumWidth(screen_width * 0.12)
+        #self.scroll_area.setMinimumSize(screen_width * 0.13, screen_height * 0.2)
+
+        #self.scroll_area.setWidgetResizable(False)
         self.scroll_area.setStyleSheet("background-color: #ffffff")
         self.legend_container = QWidget()
         
@@ -140,30 +163,36 @@ class MatplotlibPlotWidget(QWidget):
 
         self.layout_scroll_section = QVBoxLayout()
         
-        self.pad_widget_top = QWidget()
-        self.pad_widget_top.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        #self.pad_widget_top = QWidget()
+        #self.pad_widget_top.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
-        self.layout_scroll_section.addWidget(self.pad_widget_top)
+        #self.layout_scroll_section.addWidget(self.pad_widget_top)
         self.layout_scroll_section.addWidget(self.scroll_area)
 
-        self.pad_widget_button = QWidget()
-        self.pad_widget_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.layout_scroll_section.addWidget(self.pad_widget_button)
+        #self.pad_widget_button = QWidget()
+        #self.pad_widget_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        #elf.layout_scroll_section.addWidget(self.pad_widget_button)
 
         layout.addLayout(self.layout_scroll_section)
-
+        
         self.canvas.setVisible(False)
         #self.legend_container.adjustSize()
 
         #self.ax.text(0.5, 0.5, 'Ningua semilla seleccionada', horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
 
+    def adjust_scroll_area_size(self):
+        # Ajustar la altura del contenedor según el número de elementos
+        num_elements = self.legend_layout.count()
+        
+        new_height = min(self.desired_height_in_pixels, num_elements * self.height_per_line_legend)  # Ajustar este cálculo según tus necesidades
+        self.scroll_area.setFixedHeight(new_height)
 
     def update_leyend(self):
         
-        for i in reversed(range(self.layout_scroll_section.count())):
-            widget = self.layout_scroll_section.itemAt(i).widget()
-            self.layout_scroll_section.removeWidget(widget)
-            widget.setParent(None)
+        #for i in reversed(range(self.layout_scroll_section.count())):
+        #    widget = self.layout_scroll_section.itemAt(i).widget()
+        #    self.layout_scroll_section.removeWidget(widget)
+        #    widget.setParent(None)
 
          # Limpiar la leyenda antes de actualizarla
         for i in reversed(range(self.legend_layout.count())):
@@ -181,9 +210,9 @@ class MatplotlibPlotWidget(QWidget):
             entry_layout.setAlignment(Qt.AlignCenter)
             color_patch = QLabel()
             color_patch.setFixedSize(40, 5)
-            color_patch.setStyleSheet(f"background-color: {color}; border: none;")
+            color_patch.setStyleSheet(f"background-color: {color}; border: none; padding: 0px; margin: 0px")
             text_label = QLabel(label_text)
-            text_label.setFont(QFont("Roboto", 11, QFont.Normal))
+            text_label.setFont(QFont("Roboto", 10, QFont.Normal))
             entry_layout.addWidget(color_patch)
             entry_layout.addWidget(text_label)
             entry_layout.addStretch()
@@ -193,14 +222,12 @@ class MatplotlibPlotWidget(QWidget):
         
         self.legend_container.adjustSize()
 
-        self.layout_scroll_section.addWidget(self.pad_widget_top)
-        self.layout_scroll_section.addWidget(self.scroll_area)
-        self.layout_scroll_section.addWidget(self.pad_widget_button)
+        self.adjust_scroll_area_size()
+        #self.layout_scroll_section.addWidget(self.pad_widget_top)
+        #self.layout_scroll_section.addWidget(self.scroll_area)
+        #self.layout_scroll_section.addWidget(self.pad_widget_button)
 
-        
-
-        
-    
+           
     def update_plot(self, x_data, y_data, labels):
                     
                     #*y_data_labels):
@@ -222,6 +249,7 @@ class MatplotlibPlotWidget(QWidget):
         #self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         #self.ax.legend(loc='upper left')
         self.canvas.draw()
+        self.adjustSize()
         
     
     def clear_plot(self):
@@ -414,6 +442,7 @@ class HomeWindow(QWidget):
     
     def initUI(self):
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(40,40,40,40)
         #self.setStyleSheet()
         logo_inictel = QLabel()
         logo_inictel.setPixmap(QPixmap("./icons/logo_inictel.png").scaled(100,100, Qt.KeepAspectRatio))
@@ -483,8 +512,9 @@ class ProcessingForm(QWidget):
         procesing_form_layout.setAlignment(Qt.AlignTop)
         
         self.setLayout(procesing_form_layout)
-
-        self.setMaximumSize(800, 16777215)
+        screen = QApplication.primaryScreen()
+        screen_size = screen.size()
+        self.setMaximumSize(screen_size)
 
         # Layout de cada campo del formulario
 
@@ -875,7 +905,7 @@ class ProcessingForm(QWidget):
     def load_rgb_image(self, path):
        
         pixmap = QPixmap(path)
-        self.label_image_selected.setPixmap(pixmap.scaled(200,200, Qt.KeepAspectRatio))
+        self.label_image_selected.setPixmap(pixmap.scaled(150,150, Qt.KeepAspectRatio))
         self.label_image_selected.setVisible(True)
         self.default_values_hsv_options()
     
@@ -898,12 +928,27 @@ class ImageGridWidget(QWidget):
         self.image_labels = {}
         self.image_clickable = image_clickable
         self.on_image_clicked = None
+
+         # Obtén el tamaño de la pantalla y la densidad de píxeles
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+
+        # Establece la proporción deseada de la pantalla que la imagen debe ocupar (por ejemplo, 50%)
+        proportion_of_screen = 0.095
+
+        # Calcula el tamaño deseado en píxeles basado en la proporción de la pantalla
+        self.desired_width_in_pixels = int(screen_width * proportion_of_screen)
+        self.desired_height_in_pixels = int(screen_height * proportion_of_screen)
     
     def initUI(self, background_text):
         #self.setStyleSheet("background-color: rgba(255, 255, 255, 150);")
         self.grid_layout = QGridLayout()
+        self.grid_layout.setContentsMargins(10, 10, 10, 10)
+        self.grid_layout.setSpacing(2)
         self.setLayout(self.grid_layout)
-        self.setMinimumSize(600, 400)
+        #self.setMinimumSize(600, 300)
         # Mostrar text in backgroud
         self.no_image_label = QLabel(background_text)
         self.no_image_label.setAlignment(Qt.AlignCenter)
@@ -918,7 +963,7 @@ class ImageGridWidget(QWidget):
 
         # Creamos un QLabel y establecemos la imagen como su pixmap
         image_label = QLabel()
-        image_label.setPixmap(pixmap.scaled(100,100,Qt.KeepAspectRatio))
+        image_label.setPixmap(pixmap.scaled(self.desired_width_in_pixels, self.desired_height_in_pixels, Qt.KeepAspectRatio))
         image_label.setAlignment(Qt.AlignCenter)
 
         # Permitimos que el QLabel sea seleccionable
@@ -926,6 +971,8 @@ class ImageGridWidget(QWidget):
             image_label.setCursor(Qt.PointingHandCursor)
             image_label.mousePressEvent = lambda event: self.image_clicked(
                 event, image_label, id_label)
+            image_label.setEnabled(False)
+
 
         image_label.setToolTip(f'Semilla-{id_label}')
 
@@ -935,6 +982,26 @@ class ImageGridWidget(QWidget):
         self.image_labels[id_label] = False
 
         self.no_image_label.setVisible(False)
+
+    def select_all(self):
+        for i in reversed(range(self.grid_layout.count())):
+            widget = self.grid_layout.itemAt(i).widget()
+            widget.setEnabled(True)
+            widget.setStyleSheet("border: 3px solid green;")
+
+        for key in self.image_labels.keys():
+            self.image_labels[key] = True
+
+    def enable_images_clicked(self):
+        for i in reversed(range(self.grid_layout.count())):
+            widget = self.grid_layout.itemAt(i).widget()
+            widget.setEnabled(True)
+
+
+    def disable_images_clicked(self):
+        for i in reversed(range(self.grid_layout.count())):
+            widget = self.grid_layout.itemAt(i).widget()
+            widget.setEnabled(False)
 
     def clear_images(self):
         for i in reversed(range(self.grid_layout.count())):
@@ -952,7 +1019,7 @@ class ImageGridWidget(QWidget):
             image_label.setStyleSheet("border: 3px solid green;")
         else:
             image_label.setStyleSheet("")
-            image_label.setStyleSheet("border: 3px solid black;")
+            #image_label.setStyleSheet("border: 3px solid black;")
         
         if self.on_image_clicked:
             self.on_image_clicked(id_image, self.image_labels)
@@ -983,7 +1050,19 @@ class PanelFullImage(QFrame):
             }
         """
         
-        self.setMinimumHeight(250)
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+
+        # Establece la proporción deseada de la pantalla que la imagen debe ocupar (por ejemplo, 50%)
+        proportion_of_screen = 0.50
+
+        # Calcula el tamaño deseado en píxeles basado en la proporción de la pantalla
+        desired_width_in_pixels = int(screen_width * 0.40)
+        desired_height_in_pixels = int(screen_height * 0.45)
+                                       
+        self.setMinimumSize(desired_width_in_pixels, desired_height_in_pixels)
 
         self.setStyleSheet(style)
       
@@ -1192,7 +1271,11 @@ class FeatureExtractionWindow(QWidget):
         self.initUI()
     
     def initUI(self):
-        
+        screen = QApplication.primaryScreen()
+        available_geometry = screen.availableGeometry()
+        #screen_size = screen.size()
+        #self.setMaximumSize(available_geometry.width(), available_geometry.height())
+
         main_layout = QVBoxLayout()
         main_content_layout = QHBoxLayout()
 
@@ -1250,7 +1333,27 @@ class FeatureExtractionWindow(QWidget):
         tab_widget = QTabWidget()
         process_view_layout.addWidget(tab_widget)
 
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+
+        # Establece la proporción deseada de la pantalla que la imagen debe ocupar (por ejemplo, 50%)
+        proportion_of_screen = 0.45
+
+        # Calcula el tamaño deseado en píxeles basado en la proporción de la pantalla
+        desired_width_in_pixels = int(screen_width * proportion_of_screen)
+        desired_height_in_pixels = int(screen_height * proportion_of_screen)
+
+        #scroll_seeds = QScrollArea()
+        #scroll.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        #scroll_seeds.setWidgetResizable(True)
+
+        tab_widget.setFixedSize(desired_width_in_pixels, desired_height_in_pixels)
+
         self.seeds_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada")
+        
+        #scroll_seeds.setWidget(self.seeds_tab)
 
         self.seeds_tab.onImageClicked(lambda id_image, images_checked: self.show_features(images_checked))
         
@@ -1291,6 +1394,10 @@ class FeatureExtractionWindow(QWidget):
         process_view_layout.addWidget(spectrum_header)
 
         tab_hci_data = QTabWidget()
+        #desired_width_in_pixels = int(screen_width * proportion_of_screen)
+        desired_height_in_pixels = int(screen_height * 0.30)
+
+        tab_hci_data.setFixedSize(desired_width_in_pixels, desired_height_in_pixels)
         process_view_layout.addWidget(tab_hci_data)
         
         ## Tab de grafico de avg 
@@ -1309,7 +1416,7 @@ class FeatureExtractionWindow(QWidget):
 
         tab_hci_data.addTab(self.spectrum_avg_plot, "Espectro (Promedio)")
         ## Tab de grafico de desviacion estandar 
-        self.spectrum_std_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
+        self.spectrum_std_plot = MatplotlibPlotWidget(xlabel="wave length", ylabel="radiance")
 
         #self.spectrum_sd_graph =  QWidget()
         #self.spectrum_sd_graph.setStyleSheet("background-color: #f0f0f0;")
@@ -1459,11 +1566,18 @@ class FeatureExtractionWindow(QWidget):
             mask_black_frame = np.zeros((max_dimension, max_dimension, 3), dtype=np.uint8)
             mask_black_frame[inicio_y: inicio_y + h_seed, inicio_x: inicio_x + w_seed, :] = seed_mask[..., np.newaxis]
             self.masks_tab.add_image(mask_black_frame, row, column, i)
+        
+        self.seeds_tab.adjustSize()
     
 class MainWindow(QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
+        
+        screen = QApplication.primaryScreen()
+        available_geometry = screen.availableGeometry()
+        #screen_size = screen.size()
+        self.setMaximumSize(available_geometry.width(), available_geometry.height())
         
         self.setWindowTitle("IDENTISEED")
         # Cargar la imagen del icono
@@ -1474,9 +1588,10 @@ class MainWindow(QMainWindow):
         
         # Main Layout Principal
         self.main_layout = QVBoxLayout()
-        self.main_layout.setContentsMargins(20,20,20,20)
+        self.main_layout.setContentsMargins(0,0,0,0)
         self.main_layout.setSpacing(0)
-        
+        self.main_layout.setAlignment(Qt.AlignTop)
+
         main_content_layout = QHBoxLayout()
        
         #main_layout.setContentsMargins(20,20,20,20)
@@ -1505,7 +1620,7 @@ class MainWindow(QMainWindow):
         self.home_window.button_start.clicked.connect(self.on_extract_spectral_feactures)
 
         self.feature_extraction_window = FeatureExtractionWindow()
-        
+        self.feature_extraction_window.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.main_layout.addWidget(self.home_window)
         #main_layout.addLayout(main_content_layout)
         #main_layout.addWidget(self.progress_bar, alignment= Qt.AlignTop)
@@ -1865,6 +1980,10 @@ class MainWindow(QMainWindow):
         self.spectrum_data = spectrum_data
         print("\nself.spectrum_data:", self.spectrum_data)
         self.feature_extraction_window.setSpectrumData(self.spectrum_data)
+        
+        self.feature_extraction_window.seeds_tab.enable_images_clicked()
+        self.feature_extraction_window.seeds_tab.select_all()
+        
         images_checked = self.feature_extraction_window.seeds_tab.get_images_clicked_status()
         self.feature_extraction_window.show_features(images_checked)
 
@@ -1890,7 +2009,7 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 window = MainWindow()
-window.resize(300, 200)
+#window.resize(300, 200)
 
 screen_geometry = app.primaryScreen().geometry()
 screen_width = screen_geometry.width()
@@ -1906,7 +2025,7 @@ y = (screen_height - window_height) // 2
 
 print("x:", x)
 # Mueve la ventana al centro de la pantalla
-window.move(x, y)
+#window.move(x, y)
 
 window.show()
 app.exec()
