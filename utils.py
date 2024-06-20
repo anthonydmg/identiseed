@@ -601,6 +601,27 @@ def several_seeds(row_column,mask,frame_RGB,frame_bands,centro_x,centro_y,ancho,
         plt.show(block=True)
     return y_mean,y_std
 
+def morfo_features_extraction(image_seed, seed_mask):
+    contornos, _ = cv2.findContours(seed_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contorno = contornos[0]
+
+    # calcular area
+    area = cv2.contourArea(contorno)
+
+    # calcular perimetro
+    perimetro = cv2.arcLength(contorno, True)
+    
+    x, y, w, h = cv2.boundingRect(contorno)
+    
+    relacion_aspecto = w / h
+
+    morfo_features = {"area": area, "perimetro": perimetro, "relacion_aspecto": relacion_aspecto}
+    
+    
+    return morfo_features
+
+
+
 def seeds_extraction(row_column,mask,frame_RGB,centro_x,centro_y,ancho,largo,angulo, plot = False):
     row=row_column[0]
     column=row_column[1]
@@ -685,7 +706,7 @@ def seeds_extraction(row_column,mask,frame_RGB,centro_x,centro_y,ancho,largo,ang
 
         print(len([contornos[n]]))
         #print(cv2.contourArea(contornos_2[0]))
-        cv2.drawContours(mini_frame_rgb_seg_obs, [contornos[n]], -1, (0, 0, 255), 1)
+        #cv2.drawContours(mini_frame_rgb_seg_obs, [contornos[n]], -1, (0, 0, 255), 1)
         '''
         plt.figure(5)
         plt.imshow(mini_frame_rgb_seg_obs)
