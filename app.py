@@ -3,20 +3,22 @@ from PySide6.QtWidgets import (
     QMainWindow, QApplication,
     QLabel, QToolBar, QStatusBar, QCheckBox, 
     QPushButton, QDialog, QDialogButtonBox, 
-    QVBoxLayout, QMessageBox, QFileDialog,
+    QVBoxLayout, QMessageBox, QFileDialog, QScrollArea,
     QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar, QFrame, QComboBox, QSpinBox, QToolButton
 )
 from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
 from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool
-from utils import black_white, extract_one_seed_hsi_features, read_bil_file, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi
+from utils import black_white, extract_one_seed_hsi_features, metadata_hsi_image, metadata_image_tiff, read_bil_file, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi
 import cv2
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import pandas as pd
 import time
 from enum import Enum
 import os
+import math
 
 class CustomProgressBar(QProgressBar):
     def __init__(self, *args, **kwargs):
@@ -100,6 +102,132 @@ class CustomProgressBar(QProgressBar):
         painter.end()
 
 
+class MatplotlibPlotWidget(QWidget):
+    def __init__(self, xlabel, ylabel, title = None) -> None:
+        super().__init__()
+
+        layout = QHBoxLayout()
+        self.setLayout(layout)
+        self.setStyleSheet("background-color: #f0f0f0;")
+        self.setMinimumSize(400, 300)
+
+        self.fig, self.ax = plt.subplots()
+        self.canvas = FigureCanvas(self.fig)
+        layout.addWidget(self.canvas)
+        
+        self.title = title
+        
+        self.xlabel = xlabel
+        self.ylabel = ylabel
+
+        if title:
+            self.ax.set_title(title)
+        
+        self.ax.set_xlabel(xlabel)
+        self.ax.set_ylabel(ylabel)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(False)
+        self.scroll_area.setStyleSheet("background-color: #ffffff")
+        self.legend_container = QWidget()
+        
+        #self.legend_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        self.legend_layout = QVBoxLayout(self.legend_container)
+        self.legend_layout.setSpacing(0)
+        
+        self.scroll_area.setWidget(self.legend_container)
+
+        self.layout_scroll_section = QVBoxLayout()
+        
+        self.pad_widget_top = QWidget()
+        self.pad_widget_top.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        self.layout_scroll_section.addWidget(self.pad_widget_top)
+        self.layout_scroll_section.addWidget(self.scroll_area)
+
+        self.pad_widget_button = QWidget()
+        self.pad_widget_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.layout_scroll_section.addWidget(self.pad_widget_button)
+
+        layout.addLayout(self.layout_scroll_section)
+
+        self.canvas.setVisible(False)
+        #self.legend_container.adjustSize()
+
+        #self.ax.text(0.5, 0.5, 'Ningua semilla seleccionada', horizontalalignment='center', verticalalignment='center', transform=self.ax.transAxes)
+
+
+    def update_leyend(self):
+        
+        for i in reversed(range(self.layout_scroll_section.count())):
+            widget = self.layout_scroll_section.itemAt(i).widget()
+            self.layout_scroll_section.removeWidget(widget)
+            widget.setParent(None)
+
+         # Limpiar la leyenda antes de actualizarla
+        for i in reversed(range(self.legend_layout.count())):
+            widget = self.legend_layout.itemAt(i).widget()
+            self.legend_layout.removeWidget(widget)
+            widget.setParent(None)
+
+        for line in self.ax.get_lines():
+            label_text = line.get_label()
+            color = line.get_color()
+
+            # Crear un widget para cada entrada de la leyenda
+            legend_entry = QWidget()
+            entry_layout = QHBoxLayout()
+            entry_layout.setAlignment(Qt.AlignCenter)
+            color_patch = QLabel()
+            color_patch.setFixedSize(40, 5)
+            color_patch.setStyleSheet(f"background-color: {color}; border: none;")
+            text_label = QLabel(label_text)
+            text_label.setFont(QFont("Roboto", 11, QFont.Normal))
+            entry_layout.addWidget(color_patch)
+            entry_layout.addWidget(text_label)
+            entry_layout.addStretch()
+            legend_entry.setLayout(entry_layout)
+
+            self.legend_layout.addWidget(legend_entry) 
+        
+        self.legend_container.adjustSize()
+
+        self.layout_scroll_section.addWidget(self.pad_widget_top)
+        self.layout_scroll_section.addWidget(self.scroll_area)
+        self.layout_scroll_section.addWidget(self.pad_widget_button)
+
+        
+
+        
+    
+    def update_plot(self, x_data, y_data, labels):
+                    
+                    #*y_data_labels):
+        # Graficamos los datos
+        self.canvas.setVisible(True)
+        self.ax.clear()
+        for y_data, label in zip(y_data, labels):
+            self.ax.plot(x_data, y_data, label = label)
+        
+        
+        if self.title is not None:
+            self.ax.set_title(self.title)
+
+        #ax.
+
+        self.ax.set_xlabel(self.xlabel)
+        self.ax.set_ylabel(self.ylabel)
+        self.update_leyend()
+        #self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        #self.ax.legend(loc='upper left')
+        self.canvas.draw()
+        
+    
+    def clear_plot(self):
+        self.ax.clear()
+        self.canvas.setVisible(False)
+
 class MatplotlibWidget(QWidget):
     def __init__(self, xlabel, ylabel, title = None) -> None:
         super().__init__()
@@ -107,7 +235,7 @@ class MatplotlibWidget(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
         self.setStyleSheet("background-color: #f0f0f0;")
-        self.setMinimumSize(600, 300)
+        self.setMinimumSize(400, 300)
 
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvas(self.fig)
@@ -140,10 +268,13 @@ class MatplotlibWidget(QWidget):
         
         if self.title is not None:
             self.ax.set_title(self.title)
-    
+
+        #ax.
+
         self.ax.set_xlabel(self.xlabel)
         self.ax.set_ylabel(self.ylabel)
-        self.ax.legend(loc='upper left')
+        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        #self.ax.legend(loc='upper left')
         self.canvas.draw()
         
     
@@ -283,17 +414,46 @@ class HomeWindow(QWidget):
     
     def initUI(self):
         main_layout = QVBoxLayout()
-        
-        description = QLabel("Extrae caracteristicas espectrales de semillas a apartir de una imagen hiperpectral")
-        description.setFont(QFont("Roboto", 20,  QFont.Medium))
+        #self.setStyleSheet()
+        logo_inictel = QLabel()
+        logo_inictel.setPixmap(QPixmap("./icons/logo_inictel.png").scaled(100,100, Qt.KeepAspectRatio))
+        logo_inictel.setStyleSheet("padding-left: 10px")
+        title = QLabel("Bienvenido a IdentiSeed")
+        title.setFont(QFont("Roboto", 25,  QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("padding-top: 10px")
+        #description = QLabel("Extrae caracteristicas espectrales y morfologicas de semillas a apartir de una imagen hiperpectral")
+        #description = QLabel("Procese una imagen hiperespectral de semillas agricolas y extra")
+        description = QLabel("Extrae caracteristicas espectrales y morfologicas de semillas agricolas a apartir de una imagen hiperpectral")
+        description.setWordWrap(True)
+        description.setFont(QFont("Roboto", 14,  QFont.Medium))
         description.setAlignment(Qt.AlignCenter)
+        description.setStyleSheet("padding-top: 25px; padding-bottom: 10px")
         imagen_description = QLabel()
         pixmap =  QPixmap("./icons/Image_home_identiseed.png")
-        imagen_description.setPixmap(pixmap.scaled(1000,1000, Qt.KeepAspectRatio))
-        imagen_description.setAlignment(Qt.AlignCenter)
-        self.button_start = QPushButton("Comenzar")
+        #pixmap = QPixmap("./icons/logo_inictel.png")
 
+        imagen_description.setPixmap(pixmap.scaled(800,800, Qt.KeepAspectRatio))
+        imagen_description.setAlignment(Qt.AlignCenter)
+        imagen_description.setStyleSheet("padding-top: 20px; padding-bottom: 30px")
+        self.button_start = QPushButton("Comenzar")
+        self.button_start.setFont(QFont("Roboto", 14,  QFont.Medium))
+        self.button_start.setStyleSheet("""
+                        QPushButton {
+                            background-color: #005A46; /* Color de fondo de los botones */
+                            color: white;              /* Color del texto de los botones */
+                        }
+                        QPushButton:hover {
+                            background-color: #004632; /* Color de fondo de los botones al pasar el ratón */
+                        }""")
+        #     background-color: #004646; 
+        #                                color: white;
+        
+        #spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        main_layout.addWidget(logo_inictel, alignment= Qt.AlignRight)
+        main_layout.addWidget(title)
         main_layout.addWidget(description)
+        #main_layout.addItem(spacer)
         main_layout.addWidget(imagen_description)
         main_layout.addWidget(self.button_start)
 
@@ -728,7 +888,6 @@ class ProcessingForm(QWidget):
         return True
 
 
-
 class ImageGridWidget(QWidget):
     def __init__(self, 
                  background_text = "NINGUNA IMAGEN",
@@ -738,6 +897,7 @@ class ImageGridWidget(QWidget):
         self.initUI(background_text)
         self.image_labels = {}
         self.image_clickable = image_clickable
+        self.on_image_clicked = None
     
     def initUI(self, background_text):
         #self.setStyleSheet("background-color: rgba(255, 255, 255, 150);")
@@ -793,9 +953,15 @@ class ImageGridWidget(QWidget):
         else:
             image_label.setStyleSheet("")
             image_label.setStyleSheet("border: 3px solid black;")
+        
+        if self.on_image_clicked:
+            self.on_image_clicked(id_image, self.image_labels)
     
     def get_images_clicked_status(self):
         return self.image_labels
+
+    def onImageClicked(self, func):
+        self.on_image_clicked = func
     
 class PanelFullImage(QFrame):
     def __init__(self) -> None:
@@ -941,7 +1107,7 @@ class PanelFileInformation(QFrame):
 
         layout_resolution.addWidget(resolution_field_label)
        
-        self.resolution_value_label = QLabel("640x420")
+        self.resolution_value_label = QLabel("")
         self.resolution_value_label.setFont(QFont("Roboto", 11, QFont.Normal))
         layout_resolution.addWidget(self.resolution_value_label)
         
@@ -951,7 +1117,7 @@ class PanelFileInformation(QFrame):
         layout_type_file_rgb = QHBoxLayout()
         layout_type_file_rgb.addWidget(type_file_field_label)
 
-        self.type_file_rgb_value = QLabel("TIF")
+        self.type_file_rgb_value = QLabel("")
         self.type_file_rgb_value.setFont(QFont("Roboto", 11, QFont.Normal))
         layout_type_file_rgb.setAlignment(Qt.AlignLeft)
         layout_type_file_rgb.addWidget(self.type_file_rgb_value)
@@ -969,7 +1135,7 @@ class PanelFileInformation(QFrame):
         
         spectral_range_label = QLabel("Rango Espectral:")
         spectral_range_label.setFont(QFont("Roboto", 11, QFont.Normal))
-        self.spectral_range_value = QLabel("400nm - 900nm")
+        self.spectral_range_value = QLabel("")
         self.spectral_range_value.setFont(QFont("Roboto", 11, QFont.Normal))
         layout_spectral_range.addWidget(spectral_range_label)
         layout_spectral_range.addWidget( self.spectral_range_value)
@@ -981,7 +1147,7 @@ class PanelFileInformation(QFrame):
         num_bands_label.setFont(QFont("Roboto", 11, QFont.Normal))
         
         layout_num_bands.addWidget(num_bands_label)
-        self.num_bands_value = QLabel("240")
+        self.num_bands_value = QLabel("")
         self.num_bands_value.setFont(QFont("Roboto", 11, QFont.Normal))
         layout_num_bands.addWidget(self.num_bands_value)
 
@@ -990,11 +1156,11 @@ class PanelFileInformation(QFrame):
 
         type_file_hsi_field_label = QLabel("Tipo de archivo:")
         type_file_hsi_field_label.setFont(QFont("Roboto", 11, QFont.Normal))
-        type_file_hsi_value_label = QLabel("BIL")
-        type_file_hsi_value_label.setFont(QFont("Roboto", 11, QFont.Normal))
+        self.type_file_hsi_value_label = QLabel("")
+        self.type_file_hsi_value_label.setFont(QFont("Roboto", 11, QFont.Normal))
 
         layout_type_file_hsi.addWidget(type_file_hsi_field_label)
-        layout_type_file_hsi.addWidget(type_file_hsi_value_label)
+        layout_type_file_hsi.addWidget(self.type_file_hsi_value_label)
 
         main_layout.addWidget(info_file_hsi_label)
         main_layout.addLayout(layout_spectral_range)
@@ -1004,6 +1170,17 @@ class PanelFileInformation(QFrame):
         self.setLayout(main_layout)
         #pass
 
+    def setInfoFileRGB(self, image_shape, format):
+        self.resolution_value_label.setText(f"{image_shape[0]}x{image_shape[1]}")
+        self.type_file_rgb_value.setText(format.upper())
+
+    def setInfoFileHSI(self, hsi_shape, spec_range, format):
+        self.num_bands_value.setText(f"{hsi_shape[2]}")
+        min_range = spec_range[0]
+        max_range = spec_range[1]
+        self.spectral_range_value.setText(f"{min_range}nm - {max_range}nm")
+        self.type_file_hsi_value_label.setText(format.upper())
+
     def paintEvent(self, event):
         super().paintEvent(event)
 
@@ -1011,6 +1188,7 @@ class FeatureExtractionWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.spectrum_data = None
+        self.wavelength = None
         self.initUI()
     
     def initUI(self):
@@ -1045,10 +1223,10 @@ class FeatureExtractionWindow(QWidget):
                """)
         
         self.panel_file_info_widget = PanelFileInformation()
-        self.panel_file_info_widget .setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.panel_file_info_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         image_information_layout.addWidget(panel_image_title)
 
-        image_information_layout.addWidget(self.panel_image_info_widget)
+        image_information_layout.addWidget(self.panel_image_info_widget, alignment= Qt.AlignCenter)
         image_information_layout.addWidget(panel_file_info_title)
         image_information_layout.addWidget(self.panel_file_info_widget)
 
@@ -1073,6 +1251,9 @@ class FeatureExtractionWindow(QWidget):
         process_view_layout.addWidget(tab_widget)
 
         self.seeds_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada")
+
+        self.seeds_tab.onImageClicked(lambda id_image, images_checked: self.show_features(images_checked))
+        
         self.masks_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada", image_clickable = False)
 
         tab_widget.addTab(self.seeds_tab, "Semillas")
@@ -1080,11 +1261,11 @@ class FeatureExtractionWindow(QWidget):
 
         ## Boton de ver grafico de bandas espectradles
         color_boton = QColor(0, 70, 70)
-        spectrum_button = QPushButton("Mostrar Informacion Espectral")
-        spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        spectrum_button.clicked.connect(self.button_show_spectrum)
+        #spectrum_button = QPushButton("Mostrar Informacion Espectral")
+        #spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
+        #spectrum_button.clicked.connect(self.button_show_spectrum)
         
-        process_view_layout.addWidget(spectrum_button)
+        #process_view_layout.addWidget(spectrum_button)
 
         ## Header se seccion de descarga de informacion hypespectral
         spectrum_header = QWidget()
@@ -1113,7 +1294,7 @@ class FeatureExtractionWindow(QWidget):
         process_view_layout.addWidget(tab_hci_data)
         
         ## Tab de grafico de avg 
-        self.spectrum_avg_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
+        self.spectrum_avg_plot = MatplotlibPlotWidget(xlabel="wave length", ylabel="radiance")
 
         #self.spectrum_avg_graph =  QWidget()
         #self.spectrum_avg_graph.setStyleSheet("background-color: #f0f0f0;")
@@ -1155,6 +1336,36 @@ class FeatureExtractionWindow(QWidget):
     def setSpectrumData(self, data):
         self.spectrum_data = data
     
+    def setWavelength(self, wavelength):
+        self.wavelength = wavelength
+
+    def show_features(self, images_checked):
+        images_clicked_ids = [ key for key, value in images_checked.items() if value]
+      
+        if self.wavelength:
+            x = self.wavelength
+        elif self.spectrum_data:
+            x = self.spectrum_data['0']["x_long_waves"]
+        else:
+            return
+
+        y_mean_data = []
+        y_std_data = []
+        seed_labels = []
+
+
+        for image_id in images_clicked_ids:
+            y_mean = self.spectrum_data[str(image_id)]["y_mean"]
+            y_std = self.spectrum_data[str(image_id)]["y_std"]
+            seed_label = f"semilla-{image_id}"
+
+            y_mean_data.append(y_mean)
+            y_std_data.append(y_std)
+            seed_labels.append(seed_label)
+        
+        self.spectrum_avg_plot.update_plot(x_data=x, y_data = y_mean_data, labels=seed_labels)
+        self.spectrum_std_plot.update_plot(x_data=x, y_data = y_std_data, labels=seed_labels)
+
 
     def button_show_spectrum(self):
         #Crear y agregar el gráfico dentro de la sección del gráfico
@@ -1255,12 +1466,12 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         
         self.setWindowTitle("IDENTISEED")
-        self.setGeometry(100, 100, 500, 200)
-        # Colores
-        color_fondo = QColor(240, 240, 240)
-        color_boton = QColor(0, 70, 70)
-        color_texto = QColor(0, 0, 0)
+        # Cargar la imagen del icono
+        icon = QIcon("./icons/inictel.ico")
 
+        self.setWindowIcon(icon)
+        #self.setGeometry(100, 100, 500, 200)
+        
         # Main Layout Principal
         self.main_layout = QVBoxLayout()
         self.main_layout.setContentsMargins(20,20,20,20)
@@ -1289,116 +1500,7 @@ class MainWindow(QMainWindow):
         button_action_help1.triggered.connect(self.on_dowload_manual)
         help_menu.addAction(button_action_help1)
                 
-         
-        #self.image_information_seccion_widget = QWidget()
       
-        #self.image_information_seccion_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
-
-        #image_information_layout = QVBoxLayout(self.image_information_seccion_widget)
-
-        #panel_image_title = QLabel("Imagen RGB")
-        #panel_image_title.setFont(QFont("Roboto", 14, QFont.Bold))
-        #panel_image_title.setStyleSheet("""
-        #        color: #000000;
-        #        background-color: #f0f0f0;
-        #        padding: 5px;
-        #        margin: 0px                  
-        #       """)
-        #self.panel_image_info_widget = PanelFullImage()
-
-        #panel_file_info_title = QLabel("Panel de Informacion")
-        #panel_file_info_title.setFont(QFont("Roboto", 14, QFont.Bold))
-        #panel_file_info_title.setStyleSheet("""
-        #        color: #000000;
-        #        background-color: #f0f0f0;
-        #        padding: 5px;
-        #        margin: 0px                  
-        #       """)
-        
-        #self.panel_file_info_widget = PanelFileInformation()
-        #self.panel_file_info_widget .setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        #image_information_layout.addWidget(panel_image_title)
-
-        #image_information_layout.addWidget(self.panel_image_info_widget)
-        #image_information_layout.addWidget(panel_file_info_title)
-        #image_information_layout.addWidget(self.panel_file_info_widget)
-
-       
-
-        #main_content_layout.addWidget(self.image_information_seccion_widget)
-
-        #processing_form_widget =  ProcessingForm()
-        #main_layout.addWidget(processing_form_widget)
-        
-        #main_layout.addWidget(self.progress_bar)
-        #main_layout.addItem(QSpacerItem(20,20, QSizePolicy.Fixed, QSizePolicy.Minimum))
-        
-        # Vista de las semillas identificadas
-        #self.process_view_widget = QWidget()
-      
-        #self.process_view_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
-        #process_view_layout = QVBoxLayout(self.process_view_widget)
-        
-
-        #main_content_layout.addWidget(self.process_view_widget)
-
-        #tab_widget = QTabWidget()
-        #process_view_layout.addWidget(tab_widget)
-
-        #self.seeds_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada")
-        #self.masks_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada", image_clickable = False)
-
-        #tab_widget.addTab(self.seeds_tab, "Semillas")
-        #tab_widget.addTab(self.masks_tab, "Mascaras")
-
-        ## Boton de ver grafico de bandas espectradles
-
-        #spectrum_button = QPushButton("Mostrar Informacion Espectral")
-        #spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        #spectrum_button.clicked.connect(self.button_show_spectrum)
-        
-        #process_view_layout.addWidget(spectrum_button)
-
-        ## Header se seccion de descarga de informacion hypespectral
-        #spectrum_header = QWidget()
-        #spectrum_header.setStyleSheet("font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;")
-        #spectrum_header_layout = QHBoxLayout(spectrum_header)
-       
-        #spectrum_label = QLabel("<b>Información Hiperespectral</b>")
-        #spectrum_label.setAlignment(Qt.AlignLeft)
-        #spectrum_label.setStyleSheet("font-size: 20px; color: #333; background-color: #f0f0f0; padding: 5px;")
-
-        #self.download_spectrum = QPushButton()
-        
-        #icon_download = QIcon("./icons/icons8-descargar-48.png")  # Ruta al archivo de icono
-        #self.download_spectrum.setIcon(icon_download)
-
-        #self.download_spectrum.clicked.connect(self.download_csv_spectrum)
-
-
-        #spectrum_header_layout.addWidget(spectrum_label)
-        #spectrum_header_layout.addStretch(1)
-        #spectrum_header_layout.addWidget(self.download_spectrum)
-        
-        #process_view_layout.addWidget(spectrum_header)
-
-        #tab_hci_data = QTabWidget()
-        #process_view_layout.addWidget(tab_hci_data)
-        
-        ## Tab de grafico de avg 
-        #self.spectrum_avg_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
-
-
-        #tab_hci_data.addTab(self.spectrum_avg_plot, "Espectro (Promedio)")
-        ## Tab de grafico de desviacion estandar 
-        #self.spectrum_std_plot = MatplotlibWidget(xlabel="wave length", ylabel="radiance")
-
-        #tab_hci_data.addTab(self.spectrum_std_plot, "Espectro (Des. Estandar)")
-
-        #self.progress_bar = CustomProgressBar(self)
-
-        #self.progress_bar.setRange(0, 100)
-        #self.progress_bar.setValue(0)
         self.home_window = HomeWindow()
         self.home_window.button_start.clicked.connect(self.on_extract_spectral_feactures)
 
@@ -1407,7 +1509,8 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(self.home_window)
         #main_layout.addLayout(main_content_layout)
         #main_layout.addWidget(self.progress_bar, alignment= Qt.AlignTop)
-
+        
+        
         self.central_widget = QWidget()
         self.central_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.central_widget)
@@ -1427,6 +1530,7 @@ class MainWindow(QMainWindow):
         self.dialog =  QDialog(self)
         
         self.dialog.setWindowTitle(" ")
+        self.dialog.setWindowIcon(QIcon())
         #self.dialog.setWindowFlags(Qt.FramelessWindowHint) 
         #self.dialog.setFixedSize(500, 600)  # Fijar tamaño del diálogo
         self.dialog.setStyleSheet("""
@@ -1484,7 +1588,7 @@ class MainWindow(QMainWindow):
         dialog_layout.addLayout(button_dialog_layout)
 
         self.dialog.setLayout(dialog_layout)
-        self.dialog.exec_()
+        self.dialog.exec()
 
         return ""
 
@@ -1496,9 +1600,20 @@ class MainWindow(QMainWindow):
 
             path_rgb_image = self.process_form_dialog.input_rgb_image.text()
             self.feature_extraction_window.panel_image_info_widget.set_image(path_rgb_image)
-            
+            image_shape, type_file = metadata_image_tiff(path_rgb_image)
+            self.feature_extraction_window.panel_file_info_widget.setInfoFileRGB(image_shape, type_file)
+
             path_hypespect_image = self.process_form_dialog.input_hsi.text()
+            hsi_shape, type_file_hsi, wavelength = metadata_hsi_image(path_hypespect_image)
+            print("wavelength:", wavelength)
+            wavelength = [float(v) for v in wavelength]
+            spectral_range = [math.ceil( wavelength[0] / 10)*10,  math.ceil(wavelength[-1] / 10)*10]
+
+            self.feature_extraction_window.panel_file_info_widget.setInfoFileHSI(hsi_shape, spectral_range, type_file_hsi)
             
+            self.feature_extraction_window.setWavelength(wavelength)
+
+            ## AQUI GET METADA 
             auto_filter_hsv = self.process_form_dialog.checkbox_auto.isChecked()
             
             num_row = self.process_form_dialog.num_row_spin_box.value()
@@ -1510,6 +1625,8 @@ class MainWindow(QMainWindow):
             path_black_reference = self.process_form_dialog.input_black_hsi.text()
 
             print("grid_seeds_shape:", grid_seeds_shape)
+
+            #self.wavelength = wavelength
 
             if auto_filter_hsv:
                 worker = Worker(path_rgb_image, 
@@ -1748,6 +1865,8 @@ class MainWindow(QMainWindow):
         self.spectrum_data = spectrum_data
         print("\nself.spectrum_data:", self.spectrum_data)
         self.feature_extraction_window.setSpectrumData(self.spectrum_data)
+        images_checked = self.feature_extraction_window.seeds_tab.get_images_clicked_status()
+        self.feature_extraction_window.show_features(images_checked)
 
 
     def process_finished(self, result):
@@ -1770,6 +1889,24 @@ class MainWindow(QMainWindow):
             background_label.setStyleSheet("border: 3px solid black;")
 
 app = QApplication(sys.argv)
-w = MainWindow()
-w.show()
+window = MainWindow()
+window.resize(300, 200)
+
+screen_geometry = app.primaryScreen().geometry()
+screen_width = screen_geometry.width()
+screen_height = screen_geometry.height()
+
+# Obtiene el tamaño de la ventana
+window_width = window.width()
+window_height = window.height()
+
+# Calcula las coordenadas x y y para centrar la ventana
+x = (screen_width - window_width) // 2
+y = (screen_height - window_height) // 2
+
+print("x:", x)
+# Mueve la ventana al centro de la pantalla
+window.move(x, y)
+
+window.show()
 app.exec()

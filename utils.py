@@ -77,15 +77,29 @@ def show_image_rgb(filename,plot=True):
 
     return frame_RGB
 
-def seed_detection(frame_RGB,plot=True):
+def seed_detection(frame_RGB, grid_seeds_shape = [5,5], plot=True, hue_range = None, saturation_range = None, value_range = None):
 
     frame_HSV = cv2.cvtColor(frame_RGB, cv2.COLOR_BGR2HSV)
+    
     V = int(frame_HSV[:, :, 2].mean())
+
     #print(frame_HSV[:, :, 2].mean())
     #print(frame_HSV[:, :, 2].std())
     v=0
     counter = 0
-    while counter < 25:
+    
+    if hue_range == None:
+       hue_range = (0,255)
+    
+    if saturation_range == None:
+       saturation_range = (0,255)
+
+    if value_range == None:
+       value_range = (V,255)  
+    
+    num_seeds = grid_seeds_shape[0] * grid_seeds_shape[1]
+
+    while counter < num_seeds:
         centro_x = []
         centro_y = []
         ancho = []
@@ -94,9 +108,12 @@ def seed_detection(frame_RGB,plot=True):
         counter = 0
         #print(v)
 
-        lower = np.array([0, 0, V - v], np.uint8)
-        upper = np.array([255, 255, 255], np.uint8)
+        lower = np.array([hue_range[0], saturation_range[0], value_range[0] - v], np.uint8)
+        
+        upper = np.array([hue_range[1], saturation_range[1], value_range[1]], np.uint8)
+        
         mask = cv2.inRange(frame_HSV, lower, upper)
+
         mask = cv2.erode(mask, None, iterations=2)
         cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
@@ -185,6 +202,31 @@ def give_me_the_spreed(row,column,centro_x,centro_y,spreed):
                 maiz_id[j] = i
                 break
     return(int(maiz_id[spreed]))
+
+def metadata_hsi_image(path):
+    import spectral
+    dataset = spectral.open_image(path + ".hdr")
+    type_file = dataset.metadata.get("interleave")
+    wavelength = dataset.metadata.get("wavelength")
+    print(dataset.shape)
+
+    return dataset.shape, type_file, wavelength
+
+def metadata_image_tiff(path):
+    from PIL import Image
+
+    # Abre la imagen TIFF
+    imagen = Image.open(path)
+
+    # Obtén la información básica de la imagen
+    print(f"Formato: {imagen.format}")
+    print(f"Tamaño: {imagen.size}")
+    return imagen.size, imagen.format
+
+def read_bil_file(path):
+    dataset = rasterio.open(path)
+    data = dataset.read()
+    return data
 
 def black_white(path):
     dataset_white = rasterio.open(path+'white.bil')
@@ -797,8 +839,8 @@ def analize_one_seed(filename,id_seed):
     group_of_seeds=filenames.index(filename)
     frame_RGB = show_image_rgb(filename)
     mask,centro_x, centro_y, ancho, largo, angulo, counter = seed_detection(frame_RGB,plot=False)
-    white_bands,black_bands = black_white()
-    frame_bands_correc = hyperspectral_images_seeds(filename,correction=True,white_bands=white_bands,black_bands=black_bands)
+    white_bands,black_bands = black_white("./sample_image/")
+    frame_bands_correc = hyperspectral_images_seeds("./sample_image/" + filename + ".bil",correction=True,white_bands=white_bands,black_bands=black_bands)
     one_seed(row_column[group_of_seeds], mask, frame_RGB, frame_bands_correc, centro_x, centro_y, ancho, largo, angulo,id_seed)
     return
 
@@ -860,9 +902,9 @@ def extracting_features(filename,white_bands, black_bands):
 if __name__ == '__main__':
     print('Empezar')
 
-    view_seeds("AMAZ-46-02")
+    #view_seeds("AMAZ-46-02")
 
-    #analize_one_seed("AMAZ-46-02", 12)
+    analize_one_seed("AMAZ-46-02", 12)
 
     #analize_all_seeds("AMAZ-46-02")
 
