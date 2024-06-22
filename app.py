@@ -213,7 +213,7 @@ class MatplotlibPlotWidget(QWidget):
 
         layout = QHBoxLayout()
         self.setLayout(layout)
-        self.setStyleSheet("background-color: #f0f0f0; padding: 20px;")
+        self.setStyleSheet("background-color: #f0f0f0;")
         #self.setMinimumSize(400, 300)
         
         self.fig, self.ax = plt.subplots()
@@ -255,26 +255,29 @@ class MatplotlibPlotWidget(QWidget):
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        
         self.legend_widget = QWidget()
-        
         self.legend_layout = QGridLayout(self.legend_widget)
-        
         self.scroll_area.setWidget(self.legend_widget)
+
+        self.scroll_area.setFixedHeight(self.px_12pt + 10)
+
+
         self.height_per_line_legend = screen_height * 0.08
         
-        self.scroll_area.setFixedHeight(screen_height * 0.2)
-        self.scroll_area.setMinimumWidth(screen_width * 0.12)
-        self.scroll_area.setStyleSheet("background-color: #ffffff")
+        #self.scroll_area.setFixedHeight(screen_height * 0.2)
+        
+        #self.scroll_area.setMinimumWidth(screen_width * 0.12)
+        #self.scroll_area.setStyleSheet("background-color: #ffffff")
 
-        self.layout_scroll_section = QVBoxLayout()
+        #self.layout_scroll_section = QVBoxLayout()
 
-        self.layout_scroll_section.addWidget(self.scroll_area)
+        #self.layout_scroll_section.addWidget(self.scroll_area)
 
-        layout.addLayout(self.layout_scroll_section)
+        layout.addWidget(self.scroll_area)
         
         self.canvas.setVisible(True)
-        
+    
+    
   
     def adjust_scroll_area_size(self):
         # Ajustar la altura del contenedor según el número de elementos
@@ -283,6 +286,7 @@ class MatplotlibPlotWidget(QWidget):
         new_height = min(self.desired_height_in_pixels, num_elements * self.px_12pt + 10)  # Ajustar este cálculo según tus necesidades
         self.scroll_area.setFixedHeight(new_height)
 
+    
     def update_leyend(self):
 
         # Limpiar la leyenda actual
@@ -296,7 +300,8 @@ class MatplotlibPlotWidget(QWidget):
             # Crear un widget para cada entrada de la leyenda
             color_patch = QLabel()
             color_patch.setFixedSize(40, 5)
-            color_patch.setStyleSheet(f"background-color: {color}; border: none; padding: 0px; margin: 0px")
+            #  padding: 0px; margin: 0px;
+            color_patch.setStyleSheet(f"background-color: {color}; border: none;")
             
             self.legend_layout.addWidget(color_patch, i, 0)
             self.legend_layout.addWidget(QLabel(label_text), i, 1)
@@ -326,7 +331,7 @@ class MatplotlibPlotWidget(QWidget):
         #self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         #self.ax.legend(loc='upper left')
         self.canvas.draw()
-        self.adjustSize()
+        #self.adjustSize()
         
     
     def clear_plot(self):
@@ -1558,7 +1563,7 @@ class FeatureExtractionWindow(QWidget):
         
         self.morfo_area.update_data(xvalues = xvalues, yvalues = y_area)
         self.morfo_perimeter.update_data(xvalues = xvalues, yvalues = y_perimeter)
-        self.morfo_perimeter.update_data(xvalues = xvalues, yvalues = y_ratio)
+        self.morfo_ratio.update_data(xvalues = xvalues, yvalues = y_ratio)
 
     def show_features(self, images_checked):
         images_clicked_ids = [ key for key, value in images_checked.items() if value]
@@ -1740,7 +1745,7 @@ class MainWindow(QMainWindow):
 
         self.feature_extraction_window = FeatureExtractionWindow()
         self.feature_extraction_window.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.main_layout.addWidget(self.feature_extraction_window)
+        self.main_layout.addWidget(self.home_window)
         
         
         self.central_widget = QWidget()
@@ -1757,6 +1762,7 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget( self.feature_extraction_window)
 
     def on_dowload_manual(self):
+        self.download_csv_spectrum()
         return ""
     def on_extract_spectral_feactures(self):
         self.dialog =  QDialog(self)
@@ -1894,6 +1900,7 @@ class MainWindow(QMainWindow):
             self.dialog.accept()
         return ""
     def on_save_data_spectral(self):
+        self.download_csv_spectrum()
         return ""
     def download_csv_spectrum(self):
         #options = QFileDialog.Options()
@@ -1962,27 +1969,6 @@ class MainWindow(QMainWindow):
 
         return 
 
-
-    
-    def import_image(self):
-        self.import_button.setEnabled(False)
-        self.progress_bar.setValue(0)
-
-        success_validate = self.validate_filled_form()
-        print("success_validate:", success_validate)
-        if not success_validate:
-            return
-        
-        path_rgb_image = self.line_edits[0].text()
-        path_hypespect_image = self.line_edits[2].text()
-
-        #self.thread_process = QThread()
-        worker = Worker(path_rgb_image, path_hypespect_image)
-        worker.signals.progress_changed.connect(self.update_progress)
-        worker.signals.images_masks.connect(self.show_images_masks)
-        worker.signals.spectrum_data.connect(self.recive_spectrum_data)
-        
-        self.threadpool.start(worker)
 
 
     def recive_spectrum_data(self, spectrum_data):
