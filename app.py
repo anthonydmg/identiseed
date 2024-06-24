@@ -108,7 +108,7 @@ class ScatterPlotCanvas(FigureCanvas):
         super().__init__(self.fig)
         self.xvalues = xvalues
         self.yvalues = yvalues
-        self.cmap = plt.cm.tab10
+        self.cmap = plt.cm.tab20
         self.title = title
         self.xlabel = xlabel
         self.ylabel = ylabel
@@ -122,8 +122,8 @@ class ScatterPlotCanvas(FigureCanvas):
         scatter = self.ax.scatter(range(1, len(self.xvalues) + 1), self.yvalues, color=colores)
 
         # Añadir etiquetas a cada punto
-        for i, nombre in enumerate(self.xvalues):
-            self.ax.text(i + 1, self.yvalues[i], nombre, fontsize=9, ha='left', va='bottom')
+        #for i, nombre in enumerate(self.xvalues):
+        #    self.ax.text(i + 1, self.yvalues[i], nombre, fontsize=9, ha='left', va='bottom')
 
         # Crear la leyenda manualmente
         #handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colores[i], markersize=10, label=nombre) for i, nombre in enumerate(self.xvalues)]
@@ -186,7 +186,7 @@ class ScatterPlotWiget(QWidget):
             self.legend_layout.itemAt(i).widget().setParent(None)
 
         # Colores para cada punto usando un colormap
-        cmap = plt.cm.tab10
+        cmap = plt.cm.tab20
         colores = cmap(np.linspace(0, 1, len(self.xnames)))
 
         # Añadir cada elemento de la leyenda al layout de la leyenda
@@ -274,8 +274,8 @@ class MatplotlibPlotWidget(QWidget):
         #self.layout_scroll_section.addWidget(self.scroll_area)
 
         layout.addWidget(self.scroll_area)
-        
-        self.canvas.setVisible(True)
+        self.scroll_area.setVisible(False)
+        self.canvas.setVisible(False)
     
     
   
@@ -306,7 +306,6 @@ class MatplotlibPlotWidget(QWidget):
             self.legend_layout.addWidget(color_patch, i, 0)
             self.legend_layout.addWidget(QLabel(label_text), i, 1)
 
-
         self.adjust_scroll_area_size()
        
            
@@ -315,6 +314,8 @@ class MatplotlibPlotWidget(QWidget):
                     #*y_data_labels):
         # Graficamos los datos
         self.canvas.setVisible(True)
+        self.scroll_area.setVisible(True)
+
         self.ax.clear()
         for y_data, label in zip(y_data, labels):
             self.ax.plot(x_data, y_data, label = label)
@@ -1159,8 +1160,8 @@ class PanelFullImage(QFrame):
         proportion_of_screen = 0.50
 
         # Calcula el tamaño deseado en píxeles basado en la proporción de la pantalla
-        desired_width_in_pixels = int(screen_width * 0.40)
-        desired_height_in_pixels = int(screen_height * 0.45)
+        desired_width_in_pixels = int(screen_width * 0.35)
+        desired_height_in_pixels = int(screen_height * 0.40)
                                        
         self.setMinimumSize(desired_width_in_pixels, desired_height_in_pixels)
 
@@ -1495,11 +1496,11 @@ class FeatureExtractionWindow(QWidget):
         process_view_layout.addWidget(tab_features_data)
         
         ## Tab de grafico de avg 
-        self.spectrum_avg_plot = MatplotlibPlotWidget(xlabel="wave length", ylabel="radiance")
+        self.spectrum_avg_plot = MatplotlibPlotWidget(xlabel="Longitud de onda", ylabel="Radiancia")
 
         tab_hci_data.addTab(self.spectrum_avg_plot, "Espectro (Promedio)")
         ## Tab de grafico de desviacion estandar 
-        self.spectrum_std_plot = MatplotlibPlotWidget(xlabel="wave length", ylabel="radiance")
+        self.spectrum_std_plot = MatplotlibPlotWidget(xlabel="Longitud de onda", ylabel="Radiancia")
 
         tab_hci_data.addTab(self.spectrum_std_plot, "Espectro (Des. Estandar)")
 
@@ -1554,6 +1555,12 @@ class FeatureExtractionWindow(QWidget):
 
     def setWavelength(self, wavelength):
         self.wavelength = wavelength
+
+    def desableSelectAll(self):
+        self.seeds_tab.select_all_checkbox.setEnabled(False)
+    
+    def enableSelectAll(self):
+        self.seeds_tab.select_all_checkbox.setEnabled(True)
 
     def show_morfo_features(self, image_ids):
         y_area = []
@@ -1777,6 +1784,7 @@ class MainWindow(QMainWindow):
 
         self.download_csv_spectrum()
         return ""
+    
     def on_extract_spectral_feactures(self):
         self.dialog =  QDialog(self)
         
@@ -1846,12 +1854,13 @@ class MainWindow(QMainWindow):
             
             self.show_feature_extraction_window()
             self.feature_extraction_window.progress_bar.reset_progres_bar()
+            self.feature_extraction_window.desableSelectAll()
 
             path_rgb_image = self.process_form_dialog.input_rgb_image.text()
             self.feature_extraction_window.panel_image_info_widget.set_image(path_rgb_image)
             image_shape, type_file = metadata_image_tiff(path_rgb_image)
             self.feature_extraction_window.panel_file_info_widget.setInfoFileRGB(image_shape, type_file)
-
+            
             path_hypespect_image = self.process_form_dialog.input_hsi.text()
             hsi_shape, type_file_hsi, wavelength = metadata_hsi_image(path_hypespect_image)
             print("wavelength:", wavelength)
@@ -1912,9 +1921,11 @@ class MainWindow(QMainWindow):
 
             self.dialog.accept()
         return ""
+    
     def on_save_data_spectral(self):
         self.download_csv_spectrum()
         return ""
+    
     def download_csv_spectrum(self):
         #options = QFileDialog.Options()
         #ptions |= QFileDialog.DontUseNativeDialog
@@ -1992,9 +2003,8 @@ class MainWindow(QMainWindow):
 
         return 
 
-
-
     def recive_spectrum_data(self, spectrum_data):
+        
         self.spectrum_data = spectrum_data
         self.feature_extraction_window.setSpectrumData(self.spectrum_data)
         
@@ -2003,6 +2013,8 @@ class MainWindow(QMainWindow):
         
         images_checked = self.feature_extraction_window.seeds_tab.get_images_clicked_status()
         self.feature_extraction_window.show_features(images_checked)
+
+        self.feature_extraction_window.enableSelectAll()
 
     def recive_morfo_features(self, morfo_features):
         self.morfo_features = morfo_features

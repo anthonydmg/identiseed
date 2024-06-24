@@ -469,10 +469,10 @@ def one_seed(row_column,mask,frame_RGB,frame_bands,centro_x,centro_y,ancho,largo
         axs[2].plot(x, y_mean, label="mean")
         axs[2].plot(x, y_std, label="std")
         axs[2].legend()
-        axs[2].twinx().set_ylabel("desviacion estandar")
-        axs[2].set_xlabel('Espectro')
-        axs[2].set_ylabel('media aritmetica')
-        axs[2].set_title("Longitud de onda vs mean")
+        axs[2].twinx().set_ylabel("Espectro Desv. Estandar")
+        axs[2].set_xlabel('Longitud de Onda')
+        axs[2].set_ylabel('Espectro Medio')
+        axs[2].set_title("Caracteristicas Espectrales")
         plt.show(block=True)
     return y_mean,y_std
 
