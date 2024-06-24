@@ -6,9 +6,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QMessageBox, QFileDialog, QScrollArea,
     QHBoxLayout, QLineEdit, QWidget, QGridLayout, QSpacerItem, QSizePolicy, QTabWidget, QProgressBar, QFrame, QComboBox, QSpinBox, QToolButton
 )
-from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage
-from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool
-from utils import black_white, extract_one_seed_hsi_features, metadata_hsi_image, metadata_image_tiff, morfo_features_extraction, read_bil_file, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi
+from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage, QDesktopServices
+from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool, QUrl
+from utils import black_white, extract_one_seed_hsi_features, metadata_hsi_image, metadata_image_tiff, morfo_features_extraction, read_bil_file, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi, resource_path
 import cv2
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -495,24 +495,6 @@ class Worker(QRunnable):
         
         self.signals.progress_changed.emit(100, "Finalizado")
 
-class FileInput(QWidget):
-    def __init__(self, 
-                 label_input,
-                 color_texto = QColor(0, 0, 0),
-                 color_boton = QColor(0,0,0)
-                 ):
-        super().__init__()
-
-    
-    def initUI(self, label_input, color_texto, color_boton):
-        label_input = QLabel(label_input)
-        label_input.setStyleSheet("color: {};".format(color_texto.name()))
-        path_input = QLineEdit()
-        selection_button = QPushButton("Seleccionar")
-        selection_button.clicked.connect(self.button_open_file(path_input))
-        selection_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-    
-        return
 
 class FontType(Enum):
     MAIN_TITLE = QFont("Roboto", 24, QFont.Bold)
@@ -538,7 +520,7 @@ class HomeWindow(QWidget):
         main_layout.setContentsMargins(40,40,40,40)
         #self.setStyleSheet()
         logo_inictel = QLabel()
-        logo_inictel.setPixmap(QPixmap("./icons/logo_inictel.png").scaled(100,100, Qt.KeepAspectRatio))
+        logo_inictel.setPixmap(QPixmap(resource_path("assets/logo_inictel.png")).scaled(100,100, Qt.KeepAspectRatio))
         logo_inictel.setStyleSheet("padding-left: 10px")
         title = QLabel("Bienvenido a IdentiSeed")
         title.setFont(QFont("Roboto", 25,  QFont.Bold))
@@ -552,7 +534,8 @@ class HomeWindow(QWidget):
         description.setAlignment(Qt.AlignCenter)
         description.setStyleSheet("padding-top: 25px; padding-bottom: 10px")
         imagen_description = QLabel()
-        pixmap =  QPixmap("./icons/Image_home_identiseed.png")
+        
+        pixmap =  QPixmap(resource_path("assets/image_home_identiseed.png"))
         #pixmap = QPixmap("./icons/logo_inictel.png")
 
         imagen_description.setPixmap(pixmap.scaled(800,800, Qt.KeepAspectRatio))
@@ -1032,6 +1015,9 @@ class ImageGridWidget(QWidget):
         if self.include_select_all:
             self.main_layout = QVBoxLayout()
             self.select_all_checkbox = QCheckBox("Seleccionar todo")
+            # Conectar la señal toggled del QCheckBox a una función
+            self.select_all_checkbox.toggled.connect(self.on_checkbox_select_all)
+
             self.main_layout.addWidget(self.select_all_checkbox, alignment = Qt.AlignLeft)
             self.main_layout.addLayout(self.grid_layout)
             self.setLayout(self.main_layout)
@@ -1073,7 +1059,23 @@ class ImageGridWidget(QWidget):
 
         self.no_image_label.setVisible(False)
 
+    def on_checkbox_select_all(self, checked):
+        if checked:
+            self.select_all()
+        else:
+            self.unselect_all()
         
+
+    def unselect_all(self):
+        for i in reversed(range(self.grid_layout.count())):
+            widget = self.grid_layout.itemAt(i).widget()
+            widget.setStyleSheet("")
+        
+        for key in self.image_labels.keys():
+            self.image_labels[key] = False
+
+        if self.on_image_clicked:
+            self.on_image_clicked(0, self.image_labels)
 
     def select_all(self):
         for i in reversed(range(self.grid_layout.count())):
@@ -1083,6 +1085,9 @@ class ImageGridWidget(QWidget):
 
         for key in self.image_labels.keys():
             self.image_labels[key] = True
+
+        if self.on_image_clicked:
+            self.on_image_clicked(0, self.image_labels)
 
     def enable_images_clicked(self):
         for i in reversed(range(self.grid_layout.count())):
@@ -1113,6 +1118,9 @@ class ImageGridWidget(QWidget):
             image_label.setStyleSheet("")
             #image_label.setStyleSheet("border: 3px solid black;")
         
+        if self.include_select_all and self.select_all_checkbox.isChecked():
+            self.select_all_checkbox.setChecked(False)
+           
         if self.on_image_clicked:
             self.on_image_clicked(id_image, self.image_labels)
     
@@ -1455,15 +1463,13 @@ class FeatureExtractionWindow(QWidget):
         tab_widget.addTab(self.seeds_tab, "Semillas")
         tab_widget.addTab(self.masks_tab, "Mascaras")
 
-        ## Boton de ver grafico de bandas espectradles
-        color_boton = QColor(0, 70, 70)
-        #spectrum_button = QPushButton("Mostrar Informacion Espectral")
-        #spectrum_button.setStyleSheet("background-color: {}; color: white;".format(color_boton.name()))
-        #spectrum_button.clicked.connect(self.button_show_spectrum)
-        
-        #process_view_layout.addWidget(spectrum_button)
-
-        ## Header se seccion de descarga de informacion hypespectral
+        tab_widget.setStyleSheet("""QTabWidget QTabBar::tab {
+            font-family: Arial;
+            font-size: 14pt;
+            font-weight: bold;
+            color: #000000;
+        }""")
+   
         tab_features_data = QTabWidget()
 
         tab_features_data.setObjectName("outerTabWidget")
@@ -1705,7 +1711,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(""" QMainWindow::title {alignment: left;}""")
         
         # Cargar la imagen del icono
-        icon = QIcon("./icons/inictel.ico")
+        icon = QIcon(resource_path("assets/inictel.ico"))
 
         self.setWindowIcon(icon)
         #self.setGeometry(100, 100, 500, 200)
@@ -1722,8 +1728,8 @@ class MainWindow(QMainWindow):
         ## Menu
         menu = self.menuBar()
         file_menu = menu.addMenu("Archivo")
-        button_action_file1 = QAction("Guardar datos espectrales", self)
-        button_action_file1.setStatusTip("Guardar Datos Espectrales")
+        button_action_file1 = QAction("Exportar Caracteristicas Extraidas", self)
+        button_action_file1.setStatusTip("Exportar Caracteristicas Extraidas")
         button_action_file1.triggered.connect(self.on_save_data_spectral)
         file_menu.addAction(button_action_file1)
 
@@ -1762,6 +1768,13 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget( self.feature_extraction_window)
 
     def on_dowload_manual(self):
+        # Ruta al archivo PDF del manual de usuario
+        pdf_path = "./assets/Manual-Usuario-IdentiTree.pdf"
+
+        # Abre el PDF en el visor predeterminado del sistema
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(pdf_path)):
+            QMessageBox.critical(self, "Error", "No se pudo abrir el manual de usuario.")
+
         self.download_csv_spectrum()
         return ""
     def on_extract_spectral_feactures(self):
@@ -1917,9 +1930,19 @@ class MainWindow(QMainWindow):
             x_long_waves = self.spectrum_data['0']['x_long_waves']
 
             columns = ["seed_id"] +  [f"avg_band_{lw}" for lw in x_long_waves] + [ f"sd_band_{lw}" for lw in x_long_waves]
-            
-            print("\nself.spectrum_data:", self.spectrum_data)
-            data = [ [id_seed] + seed_data["y_mean"].tolist() + seed_data["y_std"].tolist() for id_seed , seed_data in self.spectrum_data.items()]
+    
+            morfo_features_name = ["Área", "Perímetro ","Relación de Aspecto"]
+            columns = columns + morfo_features_name
+
+            #print("\nself.spectrum_data:", self.spectrum_data)
+            data = []
+            for id_seed , seed_data in self.spectrum_data.items():
+                row_values =  [id_seed] + seed_data["y_mean"].tolist() + seed_data["y_std"].tolist()
+                seed_morfo_features =  self.morfo_features[id_seed]
+                row_values = row_values + [seed_morfo_features["area"], seed_morfo_features["perimetro"], seed_morfo_features["relacion_aspecto"]]
+                data.append(row_values)
+
+                        
             print()
             print("\ndata[0]:", data[0]) 
             df = pd.DataFrame(data, columns = columns)

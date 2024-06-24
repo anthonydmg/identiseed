@@ -6,33 +6,8 @@ import rasterio
 import cv2
 import os
 
+import sys
 
-"""
-filenames=['ANC-399-1',
-           'ANC-399-2',
-           'ANC-526-1',
-           'ANC-526-2',
-           'APUC-264-1',
-           'APUC-264-2',
-           'AREQ-155-1',
-           'AREQ-155-2',
-           'AYAC-118-1',
-           'AYAC-118-2',
-           'CAJ-63-1',
-           'CAJ-63-2',
-           'CAJA-54-1',
-           'CAJA-54-2',
-           'JUN-220-1',
-           'JUN-220-2',
-           'LBQUE-14',
-           'LIM-102-1',
-           'LIM-102-2',
-           'PUN-16-1',
-           'PUN-16-2',
-           'SMTI-131-1',
-           'SMTI-131-2',
-           'UCAY-21']
-"""
 
 filenames=['LIB-105-01',
            'LIB-105-02',
@@ -919,6 +894,15 @@ def extracting_features(filename,white_bands, black_bands):
         df=pd.concat([df, pd.DataFrame(dict(zip(keys, values)),index=[0])], ignore_index=True)
     return df
 
+def resource_path(relative_path):
+    """ Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller """
+    try:
+        # PyInstaller crea un directorio temporal y almacena el path en _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     print('Empezar')
