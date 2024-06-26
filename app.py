@@ -19,6 +19,10 @@ import time
 from enum import Enum
 import os
 import math
+import rasterio
+import rasterio.sample
+import rasterio.vrt
+import rasterio._features
 
 class CustomProgressBar(QProgressBar):
     def __init__(self, *args, **kwargs):
