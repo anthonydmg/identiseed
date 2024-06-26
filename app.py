@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction, QIcon, QPaintEvent, QPixmap, QColor, QPainter, QFont, QImage, QDesktopServices
 from PySide6.QtCore import QRunnable, Qt, QThread, Signal, QObject, QThreadPool, QUrl
-from utils import black_white, extract_one_seed_hsi_features, metadata_hsi_image, metadata_image_tiff, morfo_features_extraction, read_bil_file, seed_detection, seeds_extraction, one_seed, hyperspectral_images_seeds, long_onda, extract_one_seed_hsi, resource_path
+from utils import extract_one_seed_hsi_features, metadata_hsi_image, metadata_image_tiff, morfo_features_extraction, read_bil_file, seed_detection, seeds_extraction, hyperspectral_images_seeds, extract_one_seed_hsi, resource_path
 import cv2
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -219,7 +219,7 @@ class MatplotlibPlotWidget(QWidget):
         self.setLayout(layout)
         self.setStyleSheet("background-color: #f0f0f0;")
         #self.setMinimumSize(400, 300)
-        
+        #self.setContentsMargins(0,0,100,100)
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvas(self.fig)
         layout.addWidget(self.canvas, alignment=Qt.AlignCenter)
@@ -278,8 +278,8 @@ class MatplotlibPlotWidget(QWidget):
         #self.layout_scroll_section.addWidget(self.scroll_area)
 
         layout.addWidget(self.scroll_area)
-        self.scroll_area.setVisible(False)
-        self.canvas.setVisible(False)
+        #self.scroll_area.setVisible(False)
+        #self.canvas.setVisible(False)
     
     
   
@@ -419,7 +419,8 @@ class Worker(QRunnable):
                  grid_seeds_shape = [5,5],
                  hue_range = None, 
                  saturation_range = None, 
-                 value_range = None) -> None:
+                 value_range = None,
+                 wavelength = None) -> None:
         super(Worker, self).__init__()
 
         self.signals = WorkerSignals()
@@ -431,6 +432,7 @@ class Worker(QRunnable):
         self.grid_seeds_shape = grid_seeds_shape
         self.path_white_reference = path_white_reference
         self.path_black_reference = path_black_reference
+        self.wavelength = wavelength
 
     def run(self):
         num_seeds = self.grid_seeds_shape[0] * self.grid_seeds_shape[1]
@@ -490,8 +492,8 @@ class Worker(QRunnable):
             roi_seed = roi_seeds[i]
             y_mean, y_std = extract_one_seed_hsi_features(frame_bands_correc, dsize, mini_mask, traslate_matrix, rotate_matrix, roi_seed)
             
-            extract_one_seed_hsi([5,5], mask, image_rgb, frame_bands_correc, centro_x, centro_y, ancho, largo, angulo, i + 1, plot= False)
-            seeds_spectrum[str(i)] = {"x_long_waves": long_onda , "y_mean":  y_mean, "y_std": y_std} 
+            extract_one_seed_hsi(self.grid_seeds_shape, mask, image_rgb, frame_bands_correc, centro_x, centro_y, ancho, largo, angulo, i + 1, plot= False)
+            seeds_spectrum[str(i)] = {"x_long_waves": self.wavelength , "y_mean":  y_mean, "y_std": y_std} 
             self.signals.progress_changed.emit( 25 + (i * 75) / 25, "Extrayendo Caractersiticas Espectrales")
 
         
@@ -993,7 +995,6 @@ class ImageGridWidget(QWidget):
                  grid_shape = [5,5]):
         super().__init__()
         self.include_select_all = include_select_all
-        self.initUI(background_text, margin_top, margin_bottom, margin_left, margin_right)
         self.image_labels = {}
         self.image_clickable = image_clickable
         self.on_image_clicked = None
@@ -1010,12 +1011,32 @@ class ImageGridWidget(QWidget):
         # Calcula el tamaño deseado en píxeles basado en la proporción de la pantalla
         self.desired_width_in_pixels = int(screen_width * proportion_of_screen)
         self.desired_height_in_pixels = int(screen_height * proportion_of_screen)
+
+        self.initUI(background_text, margin_top, margin_bottom, margin_left, margin_right)
+
     
+    def update_scroll_size(self):
+        print("self.grid_layout.rowCount():", self.grid_layout.rowCount())
+        self.scroll_area.setFixedSize(self.desired_height_in_pixels * 5)
+
     def initUI(self, background_text, margin_top, margin_bottom, margin_left, margin_right):
         #self.setStyleSheet("background-color: rgba(255, 255, 255, 150);")
+        
+        #self.scroll_area = QScrollArea()
+        #self.scroll_area.setFixedSize(self.desired_width_in_pixels * 5, self.desired_height_in_pixels * 5)
+        #self.scroll_area.setWidgetResizable(True)
+        #self.legend_widget = QWidget()
+        #self.legend_layout = QGridLayout(self.legend_widget)
+        ##
+        #self.grid_layout = QGridLayout(self.legend_widget)
         self.grid_layout = QGridLayout()
         self.grid_layout.setContentsMargins(margin_left, margin_top, margin_right, margin_bottom)
         self.grid_layout.setSpacing(2)
+        ##
+        #self.scroll_area.setWidget(self.legend_widget)
+
+        #self.scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+       
         
         if self.include_select_all:
             self.main_layout = QVBoxLayout()
@@ -1024,6 +1045,7 @@ class ImageGridWidget(QWidget):
             self.select_all_checkbox.toggled.connect(self.on_checkbox_select_all)
 
             self.main_layout.addWidget(self.select_all_checkbox, alignment = Qt.AlignLeft)
+            #self.main_layout.addWidget(self.scroll_area)
             self.main_layout.addLayout(self.grid_layout)
             self.setLayout(self.main_layout)
         else:
@@ -1063,6 +1085,7 @@ class ImageGridWidget(QWidget):
         self.image_labels[id_label] = False
 
         self.no_image_label.setVisible(False)
+        #self.update_scroll_size()
 
     def on_checkbox_select_all(self, checked):
         if checked:
@@ -1376,6 +1399,7 @@ class FeatureExtractionWindow(QWidget):
         self.initUI()
     
     def initUI(self):
+        
         screen = QApplication.primaryScreen()
         available_geometry = screen.availableGeometry()
         #screen_size = screen.size()
@@ -1383,7 +1407,9 @@ class FeatureExtractionWindow(QWidget):
 
         main_layout = QVBoxLayout()
         main_content_layout = QHBoxLayout()
-
+        
+        main_layout.setContentsMargins(0,0,0,10)
+        
         self.image_information_seccion_widget = QWidget()
       
         self.image_information_seccion_widget.setStyleSheet("background-color: rgba(255, 255, 255, 100);")
@@ -1454,7 +1480,7 @@ class FeatureExtractionWindow(QWidget):
         #scroll.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         #scroll_seeds.setWidgetResizable(True)
 
-        tab_widget.setMaximumHeight(desired_height_in_pixels)
+        tab_widget.setMinimumHeight(screen_height * 0.38)
         #tab_widget.setFixedSize(desired_width_in_pixels, desired_height_in_pixels)
 
         self.seeds_tab = ImageGridWidget(background_text="Ninguna Semilla Identificada", include_select_all= True)
@@ -1470,9 +1496,9 @@ class FeatureExtractionWindow(QWidget):
 
         tab_widget.setStyleSheet("""QTabWidget QTabBar::tab {
             font-family: Arial;
-            font-size: 14pt;
+            font-size: 13pt;
             font-weight: bold;
-            color: #000000;
+            color: #000000;                     
         }""")
    
         tab_features_data = QTabWidget()
@@ -1489,11 +1515,14 @@ class FeatureExtractionWindow(QWidget):
             color: #000000;
         }
     """)
+        #tab_hci_data.setSizePolicy(QSizePolicy.Spanding, QSizePolicy.Minimum)
         #tab_hci_data.setStyleSheet()
+        tab_hci_data.setMinimumSize(screen_width * 0.57, screen_height * 0.43)
+        #tab_features_data.setMinimumSize(screen_width * 0.55, screen_height * 0.40)
         tab_features_data.addTab(tab_hci_data, "Caracteristicas Espectrales")
 
         #desired_width_in_pixels = int(screen_width * proportion_of_screen)
-        desired_height_in_pixels = int(screen_height * 0.35)
+        #desired_height_in_pixels = int(screen_height * 0.35)
 
         #tab_hci_data.setFixedSize(desired_width_in_pixels, desired_height_in_pixels)
         tab_hci_data.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
@@ -1542,7 +1571,7 @@ class FeatureExtractionWindow(QWidget):
         self.setStyleSheet("""
         #outerTabWidget QTabBar::tab {
             font-family: Arial;
-            font-size: 14pt;
+            font-size: 13pt;
             font-weight: bold;
             color: #000000;
         }
@@ -1661,7 +1690,7 @@ class FeatureExtractionWindow(QWidget):
             ## Guardar archivo
             x_long_waves = self.spectrum_data['0']['x_long_waves']
 
-            columns = ["seed_id"] +  [f"avg_band_{lw}" for lw in x_long_waves] + [ f"sd_band_{lw}" for lw in x_long_waves]
+            columns = ["seed_id"] +  [f"media_band_{lw}" for lw in x_long_waves] + [ f"desv_estandar_band_{lw}" for lw in x_long_waves]
             
             print("\nself.spectrum_data:", self.spectrum_data)
             data = [ [id_seed] + seed_data["y_mean"].tolist() + seed_data["y_std"].tolist() for id_seed , seed_data in self.spectrum_data.items()]
@@ -1718,13 +1747,14 @@ class MainWindow(QMainWindow):
         self.setMaximumSize(available_geometry.width(), available_geometry.height())
         
         self.setWindowTitle("IdentiSeed")
-
-        self.setStyleSheet(""" QMainWindow::title {alignment: left;}""")
+        self.setStyleSheet("""background-color: #ffffff;""")
+        #self.setStyleSheet(""" QMainWindow::title {alignment: left;}""")
         
         # Cargar la imagen del icono
         icon = QIcon(resource_path("assets/inictel.ico"))
 
         self.setWindowIcon(icon)
+        self.setGeometry(0, 0, 500, 200)
         #self.setGeometry(100, 100, 500, 200)
         
         # Main Layout Principal
@@ -1773,6 +1803,7 @@ class MainWindow(QMainWindow):
         print("Multithreading with maximum %d threads" % self.threadpool.maxThreadCount())
     
     def show_feature_extraction_window(self):
+        self.setGeometry(20, 20, 500, 200)
         # Reemplazar el widget actual por widget1
         self.main_layout.removeWidget(self.home_window)
         self.home_window.setParent(None)
@@ -1895,7 +1926,8 @@ class MainWindow(QMainWindow):
                                 path_hypespect_image, 
                                 grid_seeds_shape = grid_seeds_shape, 
                                 path_white_reference = path_white_reference,
-                                path_black_reference = path_black_reference)
+                                path_black_reference = path_black_reference,
+                                wavelength = wavelength)
             else:
 
                 hue_range = (self.process_form_dialog.min_hue_spin_box.value(), 
@@ -1914,7 +1946,8 @@ class MainWindow(QMainWindow):
                                 value_range, 
                                 grid_seeds_shape = grid_seeds_shape,
                                 path_white_reference = path_white_reference,
-                                path_black_reference = path_black_reference)
+                                path_black_reference = path_black_reference,
+                                wavelength = wavelength)
             
             worker.signals.progress_changed.connect(self.update_progress)
             worker.signals.images_masks.connect(self.feature_extraction_window.setImageSeeds)
@@ -1944,9 +1977,9 @@ class MainWindow(QMainWindow):
             ## Guardar archivo
             x_long_waves = self.spectrum_data['0']['x_long_waves']
 
-            columns = ["seed_id"] +  [f"avg_band_{lw}" for lw in x_long_waves] + [ f"sd_band_{lw}" for lw in x_long_waves]
+            columns = ["seed_id"] +  [f"media_band_{lw}" for lw in x_long_waves] + [ f"desv_estandar_band_{lw}" for lw in x_long_waves]
     
-            morfo_features_name = ["Área", "Perímetro ","Relación de Aspecto"]
+            morfo_features_name = ["área", "perímetro ","relación_de_aspecto"]
             columns = columns + morfo_features_name
 
             #print("\nself.spectrum_data:", self.spectrum_data)
@@ -2044,12 +2077,14 @@ window_width = window.width()
 window_height = window.height()
 
 # Calcula las coordenadas x y y para centrar la ventana
-x = (screen_width - window_width) // 2
-y = (screen_height - window_height) // 2
+x = (screen_width - window_width) // 4 + 10
+y = (screen_height - window_height) // 8
 
 print("x:", x)
+print("screen_width:", screen_width)
+print("window_width:", window_width)
 # Mueve la ventana al centro de la pantalla
-#window.move(x, y)
+window.move(x, y)
 
 window.show()
 app.exec()
