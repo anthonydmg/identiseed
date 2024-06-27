@@ -414,8 +414,8 @@ def one_seed(row_column,mask,frame_RGB,frame_bands,centro_x,centro_y,ancho,largo
 
         mini_frame_rgb_seg_obs = mini_frame_rgb.copy()
 
-        canny = cv2.Canny(mini_mask, 80, 10)
-        (contornos, _) = cv2.findContours(canny.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #canny = cv2.Canny(mini_mask, 80, 10)
+        (contornos, _) = cv2.findContours(mini_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # contornos_2 = []
         area_max = 0
         n = 0

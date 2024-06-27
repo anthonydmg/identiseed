@@ -1811,13 +1811,13 @@ class MainWindow(QMainWindow):
 
     def on_dowload_manual(self):
         # Ruta al archivo PDF del manual de usuario
-        pdf_path = "./assets/Manual-Usuario-IdentiTree.pdf"
+        pdf_path = resource_path("assets/Manual_de_usuario_Software_Identiseed_2024.pdf")
 
         # Abre el PDF en el visor predeterminado del sistema
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(pdf_path)):
             QMessageBox.critical(self, "Error", "No se pudo abrir el manual de usuario.")
 
-        self.download_csv_spectrum()
+        #self.download_csv_spectrum()
         return ""
     
     def on_extract_spectral_feactures(self):
