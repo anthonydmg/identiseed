@@ -74,39 +74,41 @@ def seed_detection(frame_RGB, grid_seeds_shape = [5,5], plot=True, hue_range = N
     
     num_seeds = grid_seeds_shape[0] * grid_seeds_shape[1]
 
-    while counter < num_seeds:
-        centro_x = []
-        centro_y = []
-        ancho = []
-        largo = []
-        angulo = []
-        counter = 0
-        #print(v)
+    for i in range(min(50, V)):
+        if counter < num_seeds:
+            centro_x = []
+            centro_y = []
+            ancho = []
+            largo = []
+            angulo = []
+            counter = 0
+            #print(v)
 
-        lower = np.array([hue_range[0], saturation_range[0], value_range[0] - v], np.uint8)
-        
-        upper = np.array([hue_range[1], saturation_range[1], value_range[1]], np.uint8)
-        
-        mask = cv2.inRange(frame_HSV, lower, upper)
+            lower = np.array([hue_range[0], saturation_range[0], value_range[0] - v], np.uint8)
+            
+            upper = np.array([hue_range[1], saturation_range[1], value_range[1]], np.uint8)
+            
+            mask = cv2.inRange(frame_HSV, lower, upper)
 
-        mask = cv2.erode(mask, None, iterations=2)
-        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+            mask = cv2.erode(mask, None, iterations=2)
+            cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-        frame_detection = frame_RGB.copy()
+            frame_detection = frame_RGB.copy()
 
-        if len(cnts) > 0:
-            for i in range(len(cnts)):
-                (center_x, center_y), (width, height), angle = cv2.minAreaRect(cnts[i])
-                if width > 20.0 and height > 20.0:
-                    min_rect = np.intp(cv2.boxPoints(((center_x, center_y), (width, height), angle)))
-                    cv2.drawContours(frame_detection, [min_rect], 0, (0, 255, 0), 2)
-                    centro_x.append(center_x)
-                    centro_y.append(center_y)
-                    ancho.append(width)
-                    largo.append(height)
-                    angulo.append(angle)
-                    counter = counter + 1
-        v = v  + 1
+            if len(cnts) > 0:
+                for i in range(len(cnts)):
+                    (center_x, center_y), (width, height), angle = cv2.minAreaRect(cnts[i])
+                    if width > 20.0 and height > 20.0:
+                        min_rect = np.intp(cv2.boxPoints(((center_x, center_y), (width, height), angle)))
+                        cv2.drawContours(frame_detection, [min_rect], 0, (0, 255, 0), 2)
+                        centro_x.append(center_x)
+                        centro_y.append(center_y)
+                        ancho.append(width)
+                        largo.append(height)
+                        angulo.append(angle)
+                        counter = counter + 1
+            v = v  + 1
+
 
 
     mask_2 = mask.copy()
