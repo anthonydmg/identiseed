@@ -108,6 +108,8 @@ def seed_detection(frame_RGB, grid_seeds_shape = [5,5], plot=True, hue_range = N
                         angulo.append(angle)
                         counter = counter + 1
             v = v  + 1
+        else:
+            break
 
 
 
