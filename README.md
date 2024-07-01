@@ -17,6 +17,9 @@ El codigo fuente del proyecto esta estructurado de las siguiente manera.
 Para ejecutar el codigo, clone el repositorio o descomprima el archivo zip, luego ejecute los siguiente comando para instalar las dependencias
 
 ```
-pip3 install requiriments.txt
+pip3 install -r requirements.txt
 python app.py
 ```
+## Uso del Software
+Para usar el software descargue y descomprima el archivo zip, [identiseez.zip](https://drive.google.com/file/d/1V7Zu9COu5CqKmV4Zaac4jvERatSyo_k_/view?usp=sharing)
+Luego Ejecute el archivo EXE
