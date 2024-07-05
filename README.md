@@ -20,6 +20,18 @@ Para ejecutar el codigo, clone el repositorio o descomprima el archivo zip, lueg
 pip3 install -r requirements.txt
 python app.py
 ```
+## Generación de Ejecutable
+En Window:
+* Abrir CMD
+* Mover a la ruta del Proyecto
+* Ejecutar el archivo build.bat, escribiendo el nombre en la consolo y presionado enter.
+
+En Linux:
+* Abrir Terminal
+* Mover a la ruta del Proyecto, con el comando CD.
+* Ejecutar chmod +x build.sh
+* Ejecutar el archivo build.sh
+
 ## Uso del Software
-Para usar el software descargue y descomprima el archivo zip, [identiseez.zip](https://drive.google.com/file/d/1V7Zu9COu5CqKmV4Zaac4jvERatSyo_k_/view?usp=sharing)
+Para usar el software descargue y descomprima el archivo zip, [identiseed.zip](https://drive.google.com/file/d/1V7Zu9COu5CqKmV4Zaac4jvERatSyo_k_/view?usp=sharing)
 Luego Ejecute el archivo EXE
