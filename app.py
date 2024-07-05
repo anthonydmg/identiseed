@@ -1747,8 +1747,16 @@ class MainWindow(QMainWindow):
         self.setMaximumSize(available_geometry.width(), available_geometry.height())
         
         self.setWindowTitle("IdentiSeed")
-        self.setStyleSheet("""background-color: #ffffff;""")
-        #self.setStyleSheet(""" QMainWindow::title {alignment: left;}""")
+        #self.setStyleSheet("""background-color: #ffffff;""")
+        self.setStyleSheet("""
+        QMenuBar::item:selected { /* Cuando el cursor pasa sobre la acción */
+                background-color: #2e8b57; /* Verde oscuro */
+                color: #ffffff;
+            }
+        QMenu::item:selected { /* Cuando el cursor pasa sobre la acción */
+                background-color: #2e8b57;
+                color: #ffffff;
+            }""")
         
         # Cargar la imagen del icono
         icon = QIcon(resource_path("assets/inictel.ico"))
@@ -1796,6 +1804,7 @@ class MainWindow(QMainWindow):
         
         
         self.central_widget = QWidget()
+        self.central_widget.setStyleSheet("""background-color: #ffffff;""")
         self.central_widget.setLayout(self.main_layout)
         self.setCentralWidget(self.central_widget)
 
@@ -1964,8 +1973,6 @@ class MainWindow(QMainWindow):
         return ""
     
     def download_csv_spectrum(self):
-        #options = QFileDialog.Options()
-        #ptions |= QFileDialog.DontUseNativeDialog
         fileName, _ = QFileDialog.getSaveFileName(self, "Seleccionar archivo o carpeta", "", "CSV Files (*.csv);;All Files (*)")
         if fileName:
             # Verificar si el nombre del archivo tiene la extensión .csv
