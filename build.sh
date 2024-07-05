@@ -15,7 +15,7 @@ source ./venv/bin/activate
 #pip install pyinstaller
 
 # Generar el ejecutable con pyinstaller
-pyinstaller --windowed --add-data="assets/inictel.ico:assets" --add-data="assets/image_home_identiseed.png:assets" --add-data="assets/logo_inictel.png:assets" --add-data="assets/Manual_de_usuario_Software_Identiseed_2024.pdf:assets" -n "identiSeed" $PYTHON_FILE
+pyinstaller --windowed --add-data="assets/inictel.ico:assets" --add-data="assets/image_home_identiseed.png:assets" --add-data="assets/logo_inictel.png:assets" --add-data="assets/Manual_de_usuario_Software_Identiseed_2024.pdf:assets" --icon="assets/inictel.ico" -n "identiSeed" $PYTHON_FILE
 
 # Mover el ejecutable generado a la ubicación deseada
 #mv dist/$EXECUTABLE_NAME ./

@@ -14,7 +14,7 @@ El codigo fuente del proyecto esta estructurado de las siguiente manera.
 
 ## Instalación Local - Codigo Fuente
 
-Para ejecutar el codigo, clone el repositorio o descomprima el archivo zip, luego ejecute los siguiente comando para instalar las dependencias
+Para ejecutar la aplicacion desde el codigo fuente, clone el repositorio o descomprima el archivo zip, luego ejecute los siguiente comando para instalar las dependencias
 
 ```
 pip3 install -r requirements.txt
