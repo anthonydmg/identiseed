@@ -12,7 +12,7 @@ El codigo fuente del proyecto esta estructurado de las siguiente manera.
 `assets` - Carpeta donde se encuentran los iconos usados para la creacion de la interfaz de usuario.
 
 
-## Instalación Local
+## Instalación Local - Codigo Fuente
 
 Para ejecutar el codigo, clone el repositorio o descomprima el archivo zip, luego ejecute los siguiente comando para instalar las dependencias
 
