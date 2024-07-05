@@ -29,8 +29,14 @@ En Window:
 En Linux:
 * Abrir Terminal
 * Mover a la ruta del Proyecto, con el comando CD.
-* Ejecutar chmod +x build.sh
-* Ejecutar el archivo build.sh
+* Agregar permisos de ejecucion
+```
+chmod +x build.sh
+```
+* Ejecutar el build.sh
+```
+build.sh
+```
 
 ## Uso del Software
 Para usar el software descargue y descomprima el archivo zip, [identiseed.zip](https://drive.google.com/file/d/1V7Zu9COu5CqKmV4Zaac4jvERatSyo_k_/view?usp=sharing)
