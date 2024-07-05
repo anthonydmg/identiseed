@@ -535,7 +535,7 @@ class HomeWindow(QWidget):
         title.setStyleSheet("padding-top: 10px")
         #description = QLabel("Extrae caracteristicas espectrales y morfologicas de semillas a apartir de una imagen hiperpectral")
         #description = QLabel("Procese una imagen hiperespectral de semillas agricolas y extra")
-        description = QLabel("Extrae caracteristicas espectrales y morfologicas de semillas agricolas a apartir de una imagen hiperpectral")
+        description = QLabel("Extrae caracteristicas espectrales y morfologicas de semillas agricolas a apartir de una imagen hiperespectral")
         description.setWordWrap(True)
         description.setFont(QFont("Roboto", 14,  QFont.Medium))
         description.setAlignment(Qt.AlignCenter)
