@@ -907,6 +907,10 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
+
+def get_color_cmap():
+    colores = self.cmap(np.linspace(0, 1, len(self.ax.get_lines())))
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     print('Empezar')

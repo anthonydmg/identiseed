@@ -18,6 +18,7 @@ import pandas as pd
 import time
 from enum import Enum
 import os
+import random
 import math
 import rasterio
 import rasterio.sample
@@ -105,14 +106,28 @@ class CustomProgressBar(QProgressBar):
         painter.drawText(rect, Qt.AlignCenter, self.custom_text + remaining_time_text)
         painter.end()
 
+class ColorMap:
+    def __init__(self, num_colors = 25) -> None:
+        self.cmap = plt.cm.gist_rainbow
+        self.colores = list(self.cmap(np.linspace(0, 1,num_colors)))
+        self.colores = random.sample(self.colores, k = len(self.colores))
+    
+    def get_color(self, idx):
+        return self.colores[idx]
+
+    def update_num_colors(self, num_colors):
+        self.colores = list(self.cmap(np.linspace(0, 1, num_colors)))
+        self.colores = random.sample(self.colores, k = len(self.colores))
 
 class ScatterPlotCanvas(FigureCanvas):
-    def __init__(self, xvalues, yvalues, title = "", xlabel = "", ylabel = "", parent=None):
+    def __init__(self, xvalues, yvalues, title = "", xlabel = "", ylabel = "", parent=None, colormap = ColorMap()):
         self.fig, self.ax = plt.subplots()
         super().__init__(self.fig)
+        self.colormap = colormap
         self.xvalues = xvalues
         self.yvalues = yvalues
-        self.cmap = plt.cm.tab20
+        #self.cmap = plt.cm.tab20
+        #self.cmap = plt.cm.turbo
         self.title = title
         self.xlabel = xlabel
         self.ylabel = ylabel
@@ -120,10 +135,11 @@ class ScatterPlotCanvas(FigureCanvas):
 
     def update_plot(self):
         self.ax.clear()
-        colores = self.cmap(np.linspace(0, 1, len(self.xvalues)))
+        colores = [self.colormap.get_color(int(id)) for id in self.xvalues]#self.cmap(np.linspace(0, 1, len(self.xvalues)))
 
         # Crear el gráfico de dispersión con colores personalizados
-        scatter = self.ax.scatter(range(1, len(self.xvalues) + 1), self.yvalues, color=colores)
+        xids = [int(id) + 1 for id in self.xvalues]
+        scatter = self.ax.scatter(xids, self.yvalues, color=colores)
 
         # Añadir etiquetas a cada punto
         #for i, nombre in enumerate(self.xvalues):
@@ -142,14 +158,15 @@ class ScatterPlotCanvas(FigureCanvas):
         self.draw()
 
 class ScatterPlotWiget(QWidget):
-    def __init__(self, title = "", xlabel = "", ylabel = "") -> None:
+    def __init__(self, title = "", xlabel = "", ylabel = "", colormap = ColorMap()) -> None:
         super().__init__()
         layout = QHBoxLayout()
+        self.colormap = colormap
         self.setLayout(layout)
         self.setStyleSheet("background-color: #f0f0f0;")
         #self.setMinimumSize(400, 300)
 
-        self.canvas = ScatterPlotCanvas(xvalues = [], yvalues = [], title = title, xlabel = xlabel, ylabel = ylabel)
+        self.canvas = ScatterPlotCanvas(xvalues = [], yvalues = [], title = title, xlabel = xlabel, ylabel = ylabel, colormap = colormap)
         layout.addWidget(self.canvas)
         screen = QApplication.primaryScreen()
         screen_geometry = screen.availableGeometry()
@@ -178,25 +195,38 @@ class ScatterPlotWiget(QWidget):
         layout.addWidget(self.scroll_area)
     
     def update_data(self, xvalues = [], yvalues = []):
-            self.xnames = [f"semilla-{seed_id}" for seed_id in xvalues]
+            self.xnames = [f"semilla-{int(seed_id) + 1}" for seed_id in xvalues]
             self.canvas.xvalues = xvalues
             self.canvas.yvalues = yvalues
-            self.canvas.update_plot()
-            self.update_legend()
+            
+            if len(self.xnames) > len(self.colormap.colores):
+                self.colormap = ColorMap(num_colors=len(self.ax.get_lines()))
 
-    def update_legend(self):
+            self.canvas.update_plot()
+            
+            self.update_legend(self.xnames)
+
+    def update_legend(self, labels):
         # Limpiar la leyenda actual
         for i in reversed(range(self.legend_layout.count())):
             self.legend_layout.itemAt(i).widget().setParent(None)
 
         # Colores para cada punto usando un colormap
-        cmap = plt.cm.tab20
-        colores = cmap(np.linspace(0, 1, len(self.xnames)))
+       # cmap = plt.cm.turbo
+        #colores = cmap(np.linspace(0, 1, len(self.xnames)))
+        
+       
 
+        
         # Añadir cada elemento de la leyenda al layout de la leyenda
         for i, x_val in enumerate(self.xnames):
+            label = labels[i]
+            id = int(label.split("-")[-1]) - 1
+
+            color = self.colormap.get_color(id)
+            #color = self.colormap.get_color(i)
             color_patch = QLabel()
-            color_patch.setStyleSheet(f'background-color: rgba({colores[i][0] * 255}, {colores[i][1] * 255}, {colores[i][2] * 255}, {colores[i][3] * 255});')
+            color_patch.setStyleSheet(f'background-color: rgba({color[0] * 255}, {color[1] * 255}, {color[2] * 255}, {color[3] * 255});')
             color_patch.setFixedSize(40, 5)
             self.legend_layout.addWidget(color_patch, i, 0)
             self.legend_layout.addWidget(QLabel(x_val), i, 1)
@@ -211,10 +241,14 @@ class ScatterPlotWiget(QWidget):
         self.scroll_area.setFixedHeight(new_height)
 
 
-class MatplotlibPlotWidget(QWidget):
-    def __init__(self, xlabel, ylabel, title = None) -> None:
-        super().__init__()
 
+
+        
+class MatplotlibPlotWidget(QWidget):
+    def __init__(self, xlabel, ylabel, title = None, colormap = ColorMap()) -> None:
+        super().__init__()
+        self.colormap = colormap
+        #self.cmap = plt.cm.turbo
         layout = QHBoxLayout()
         self.setLayout(layout)
         self.setStyleSheet("background-color: #f0f0f0;")
@@ -291,21 +325,32 @@ class MatplotlibPlotWidget(QWidget):
         self.scroll_area.setFixedHeight(new_height)
 
     
-    def update_leyend(self):
+    def update_leyend(self, labels):
 
         # Limpiar la leyenda actual
         for i in reversed(range(self.legend_layout.count())):
             self.legend_layout.itemAt(i).widget().setParent(None)
+        
+        #colores = self.cmap(np.linspace(0, 1, len(self.ax.get_lines())))
+        
+        if len(self.ax.get_lines()) > len(self.colormap.colores):
+            self.colormap = ColorMap(num_colors=len(self.ax.get_lines()))
 
         for i, line in enumerate(self.ax.get_lines()):
+            label = labels[i]
+            id = int(label.split("-")[-1]) - 1
+
+            color = self.colormap.get_color(id)
             label_text = line.get_label()
-            color = line.get_color()
+            #color = color
+            #color = line.get_color()
 
             # Crear un widget para cada entrada de la leyenda
             color_patch = QLabel()
             color_patch.setFixedSize(40, 5)
             #  padding: 0px; margin: 0px;
-            color_patch.setStyleSheet(f"background-color: {color}; border: none;")
+            color_patch.setStyleSheet(f'background-color: rgba({color[0] * 255}, {color[1] * 255}, {color[2] * 255}, {color[3] * 255}); border: none;')
+            #color_patch.setStyleSheet(f"background-color: {color}; border: none;")
             
             self.legend_layout.addWidget(color_patch, i, 0)
             self.legend_layout.addWidget(QLabel(label_text), i, 1)
@@ -332,7 +377,7 @@ class MatplotlibPlotWidget(QWidget):
 
         self.ax.set_xlabel(self.xlabel)
         self.ax.set_ylabel(self.ylabel)
-        self.update_leyend()
+        self.update_leyend(labels)
         #self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         #self.ax.legend(loc='upper left')
         self.canvas.draw()
@@ -1077,7 +1122,7 @@ class ImageGridWidget(QWidget):
             image_label.setEnabled(False)
 
 
-        image_label.setToolTip(f'Semilla-{id_label}')
+        image_label.setToolTip(f'Semilla-{id_label + 1}')
 
         # Agregamos el QLabel con fondo negro y la imagen al layout
         #self.seeds_grid_layout.addWidget(background_label, row, column, alignment= Qt.AlignCenter)
@@ -1528,12 +1573,14 @@ class FeatureExtractionWindow(QWidget):
         tab_hci_data.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
         process_view_layout.addWidget(tab_features_data)
         
-        ## Tab de grafico de avg 
-        self.spectrum_avg_plot = MatplotlibPlotWidget(xlabel="Longitud de onda", ylabel="Radiancia")
+        ## Tab de grafico de avg
+        colormap = ColorMap()
+
+        self.spectrum_avg_plot = MatplotlibPlotWidget(xlabel="Longitud de onda", ylabel="Radiancia", colormap=colormap)
 
         tab_hci_data.addTab(self.spectrum_avg_plot, "Espectro (Promedio)")
         ## Tab de grafico de desviacion estandar 
-        self.spectrum_std_plot = MatplotlibPlotWidget(xlabel="Longitud de onda", ylabel="Radiancia")
+        self.spectrum_std_plot = MatplotlibPlotWidget(xlabel="Longitud de onda", ylabel="Radiancia", colormap=colormap)
 
         tab_hci_data.addTab(self.spectrum_std_plot, "Espectro (Des. Estandar)")
 
@@ -1548,9 +1595,9 @@ class FeatureExtractionWindow(QWidget):
         }
     """)
         
-        self.morfo_area = ScatterPlotWiget(xlabel="ID Semilla", ylabel= "Área (pixels)")
-        self.morfo_perimeter = ScatterPlotWiget(xlabel="ID Semilla", ylabel= "Perímetro (pixels)")
-        self.morfo_ratio = ScatterPlotWiget(xlabel="ID Semilla", ylabel= "Relación de aspecto (pixels)")
+        self.morfo_area = ScatterPlotWiget(xlabel="ID Semilla", ylabel= "Área (pixels)", colormap=colormap)
+        self.morfo_perimeter = ScatterPlotWiget(xlabel="ID Semilla", ylabel= "Perímetro (pixels)", colormap=colormap)
+        self.morfo_ratio = ScatterPlotWiget(xlabel="ID Semilla", ylabel= "Relación de aspecto (pixels)", colormap = colormap)
         
         #self.morfo_area.update_data(xvalues=["1", "2"], yvalues = [32, 42])
 
@@ -1629,7 +1676,7 @@ class FeatureExtractionWindow(QWidget):
         for image_id in images_clicked_ids:
             y_mean = self.spectrum_data[str(image_id)]["y_mean"]
             y_std = self.spectrum_data[str(image_id)]["y_std"]
-            seed_label = f"semilla-{image_id}"
+            seed_label = f"semilla-{image_id + 1}"
 
             y_mean_data.append(y_mean)
             y_std_data.append(y_std)
@@ -1693,7 +1740,7 @@ class FeatureExtractionWindow(QWidget):
             columns = ["seed_id"] +  [f"media_band_{lw}" for lw in x_long_waves] + [ f"desv_estandar_band_{lw}" for lw in x_long_waves]
             
             print("\nself.spectrum_data:", self.spectrum_data)
-            data = [ [id_seed] + seed_data["y_mean"].tolist() + seed_data["y_std"].tolist() for id_seed , seed_data in self.spectrum_data.items()]
+            data = [ [id_seed + 1] + seed_data["y_mean"].tolist() + seed_data["y_std"].tolist() for id_seed , seed_data in self.spectrum_data.items()]
             print()
             print("\ndata[0]:", data[0]) 
             df = pd.DataFrame(data, columns = columns)
